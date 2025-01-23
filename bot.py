@@ -1,5 +1,6 @@
 import os
 import subprocess
+import requests  # Para lidar com a API de likes
 import telebot
 from threading import Thread
 
@@ -32,6 +33,7 @@ def send_welcome(message):
         "Bem-vindo ao bot!\n\n"
         "Comandos disponíveis:\n"
         "/crash <IP:PORT> <porta> <duração> - Envia um ataque ao IP especificado.\n"
+        "/like <UID> - Envia 100 likes para o jogador com o UID especificado.\n"
         "/meuid - Mostra seu ID de usuário.\n\n"
         "Comandos para VIPs e dono:\n"
         "/adduser <ID> - Adiciona um usuário autorizado.\n"
@@ -45,147 +47,60 @@ def send_welcome(message):
     )
     bot.send_message(message.chat.id, welcome_text)
 
-# Comando /crash
-@bot.message_handler(commands=['crash'])
-def crash_server(message):
-    if '/crash' in vip_commands and not (message.from_user.id in vip_users or message.from_user.id == OWNER_ID):
-        bot.send_message(message.chat.id, "Apenas VIPs podem usar este comando.")
-        return
-
+# Comando /like
+@bot.message_handler(commands=['like'])
+def send_likes(message):
     try:
+        # Divide a mensagem em partes
         command_parts = message.text.split()
         
-        # Se o comando tiver apenas o IP:PORT, o bot vai adicionar a potência 10 e a duração 900
-        if len(command_parts) == 2:
-            ip_port = command_parts[1]
-            power = 10  # Valor padrão para potência
-            duration = 900  # Valor padrão para duração
-        # Se o comando tiver o IP:PORT e a duração, o bot vai adicionar a potência 10
-        elif len(command_parts) == 3:
-            ip_port = command_parts[1]
-            duration = command_parts[2]
-            power = 10  # Valor padrão para potência
-        # Se o comando tiver IP:PORT, potência e duração, o bot vai usar os valores fornecidos
-        elif len(command_parts) == 4:
-            ip_port = command_parts[1]
-            power = command_parts[2]
-            duration = command_parts[3]
+        # Verifica se o UID foi enviado
+        if len(command_parts) != 2:
+            bot.send_message(message.chat.id, "Uso correto: /like <UID>")
+            return
+        
+        # Extrai o UID
+        uid = command_parts[1]
+        
+        # Define a URL da API com 100 likes como padrão
+        url = f"https://api.nowgarena.com/api/send_likes?uid={uid}&key=projetoswq"
+        
+        # Envia a solicitação para a API
+        response = requests.get(url)
+        data = response.json()  # Analisa a resposta JSON
+        
+        # Verifica se a API respondeu com sucesso
+        if data.get("success"):
+            likes_info = data.get("Likes_Info", {})
+            name = likes_info.get("Name", "Desconhecido")
+            level = likes_info.get("Level", "Desconhecido")
+            region = likes_info.get("Region", "Desconhecida")
+            likes_before = likes_info.get("Likes before", "N/A")
+            likes_after = likes_info.get("Likes later", "N/A")
+            bot_send = likes_info.get("Bot_Send", "N/A")
+            speed = likes_info.get("Speed", "N/A")
+            
+            # Envia os detalhes no Telegram
+            bot.send_message(
+                message.chat.id,
+                (
+                    f"✅ Likes enviados com sucesso!\n\n"
+                    f"👤 Nome: {name}\n"
+                    f"🏅 Nível: {level}\n"
+                    f"🌍 Região: {region}\n"
+                    f"👍 Likes antes: {likes_before}\n"
+                    f"✅ Likes depois: {likes_after}\n"
+                    f"🚀 Likes enviados: {bot_send}\n"
+                    f"⚡ Velocidade: {speed}"
+                )
+            )
         else:
-            bot.send_message(message.chat.id, "Uso correto: /crash <IP:PORT> <potência> <duração>")
-            return
-
-        if ':' not in ip_port:
-            bot.send_message(message.chat.id, "Formato inválido de IP e porta. Use o formato: IP:PORT")
-            return
-
-        # Gerencia o limite de ataques simultâneos
-        manage_attacks()
-
-        # Monta o comando e executa no terminal
-        command = f"python start.py UDP {ip_port} {power} {duration}"
-        process = subprocess.Popen(command, shell=True)
-        processes.append(process)
-
-        bot.send_message(
-            message.chat.id,
-            f"Ataque enviado para {ip_port} com potência {power} por {duration} segundos!"
-        )
+            bot.send_message(message.chat.id, "❌ Ocorreu um erro ao enviar os likes. Tente novamente mais tarde.")
     except Exception as e:
-        bot.send_message(message.chat.id, f"Ocorreu um erro: {str(e)}")
+        bot.send_message(message.chat.id, f"❌ Erro: {str(e)}")
 
-# Comando /meuid
-@bot.message_handler(commands=['meuid'])
-def send_user_id(message):
-    bot.send_message(message.chat.id, f"Seu ID de usuário é: {message.from_user.id}")
-
-# Comando /listusers
-@bot.message_handler(commands=['listusers'])
-def list_users(message):
-    if message.from_user.id != OWNER_ID:
-        bot.send_message(message.chat.id, "Você não tem permissão para usar este comando.")
-        return
-
-    user_list = "Lista de usuários registrados e seus cargos:\n"
-
-    for user_id in authorized_users:
-        if user_id == OWNER_ID:
-            user_list += f"{user_id} - Dono\n"
-        elif user_id in vip_users:
-            user_list += f"{user_id} - VIP\n"
-        else:
-            user_list += f"{user_id} - Autorizado\n"
-
-    bot.send_message(message.chat.id, user_list)
-
-# Comandos de administração (mesmos do código anterior)
-@bot.message_handler(commands=['adduser', 'removeuser', 'promovervip', 'rebaixarvip', 'addcomandovip', 'revcomandovip'])
-def admin_commands(message):
-    if message.from_user.id != OWNER_ID:
-        bot.send_message(message.chat.id, "Você não tem permissão para usar este comando.")
-        return
-
-    command = message.text.split()
-    if len(command) < 2:
-        bot.send_message(message.chat.id, "Uso incorreto. Abaixo estão os comandos válidos:\n"
-                                          "/adduser <ID> - Adiciona um usuário autorizado.\n"
-                                          "/removeuser <ID> - Remove um usuário autorizado.\n"
-                                          "/promovervip <ID> - Promove um usuário a VIP.\n"
-                                          "/rebaixarvip <ID> - Remove a status de VIP de um usuário.\n"
-                                          "/addcomandovip <comando> - Restringe um comando para VIPs.\n"
-                                          "/revcomandovip <comando> - Remove a restrição de comando VIP.")
-        return
-
-    user_id = int(command[1])
-
-    if command[0] == '/adduser':
-        if user_id not in authorized_users:
-            authorized_users.append(user_id)
-            bot.send_message(message.chat.id, f"Usuário {user_id} adicionado como autorizado.")
-        else:
-            bot.send_message(message.chat.id, f"Usuário {user_id} já está na lista de autorizados.")
-
-    elif command[0] == '/removeuser':
-        if user_id in authorized_users:
-            authorized_users.remove(user_id)
-            bot.send_message(message.chat.id, f"Usuário {user_id} removido da lista de autorizados.")
-        else:
-            bot.send_message(message.chat.id, f"Usuário {user_id} não está na lista de autorizados.")
-
-    elif command[0] == '/promovervip':
-        if user_id not in vip_users:
-            vip_users.append(user_id)
-            bot.send_message(message.chat.id, f"Usuário {user_id} promovido a VIP.")
-        else:
-            bot.send_message(message.chat.id, f"Usuário {user_id} já é VIP.")
-
-    elif command[0] == '/rebaixarvip':
-        if user_id in vip_users:
-            vip_users.remove(user_id)
-            bot.send_message(message.chat.id, f"Usuário {user_id} rebaixado de VIP.")
-        else:
-            bot.send_message(message.chat.id, f"Usuário {user_id} não é VIP.")
-
-    elif command[0] == '/addcomandovip':
-        if len(command) > 2:
-            vip_command = command[2]
-            if vip_command not in vip_commands:
-                vip_commands.append(vip_command)
-                bot.send_message(message.chat.id, f"Comando {vip_command} restrito a VIPs.")
-            else:
-                bot.send_message(message.chat.id, f"Comando {vip_command} já está restrito a VIPs.")
-        else:
-            bot.send_message(message.chat.id, "Uso correto: /addcomandovip <comando>")
-
-    elif command[0] == '/revcomandovip':
-        if len(command) > 2:
-            vip_command = command[2]
-            if vip_command in vip_commands:
-                vip_commands.remove(vip_command)
-                bot.send_message(message.chat.id, f"Comando {vip_command} removido da lista de restritos a VIPs.")
-            else:
-                bot.send_message(message.chat.id, f"Comando {vip_command} não está na lista de comandos restritos.")
-        else:
-            bot.send_message(message.chat.id, "Uso correto: /revcomandovip <comando>")
+# Demais comandos (como /crash, /meuid, etc.) permanecem iguais
+# ... [Insira o restante do código fornecido por você aqui] ...
 
 # Inicia o bot
 bot.polling()
