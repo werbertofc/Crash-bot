@@ -88,7 +88,7 @@ def crash_server(message):
 
         bot.send_message(
             message.chat.id,
-            f"Ataque enviado para {ip_port}:{port} com potência {power} por {duration} segundos!"
+            f"Ataque enviado para {ip_port} com potência {power} por {duration} segundos!"
         )
     except Exception as e:
         bot.send_message(message.chat.id, f"Ocorreu um erro: {str(e)}")
