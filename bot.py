@@ -94,7 +94,7 @@ def start_message(message):
         "Bem-vindo ao bot! 🚀\n\n"
         "Aqui estão os comandos disponíveis para você:\n\n"
         "Comandos básicos:\n"
-        "/crash <IP:PORTA> [tempo] - Envia um ataque ao IP especificado.\n"
+        "/crash <IP:PORTA> [threads] [tempo] - Envia um ataque ao IP especificado.\n"
         "/meuid - Mostra seu ID de usuário.\n\n"
         "Comandos para usuários VIP:\n"
         "/adduser <ID> - Adiciona um usuário autorizado.\n"
@@ -104,7 +104,7 @@ def start_message(message):
         "Comandos exclusivos do dono do bot:\n"
         "/addcomandovip <comando> - Restringe um comando para VIPs.\n"
         "/revcomandovip <comando> - Remove a restrição de comando VIP.\n\n"
-        "Entre em contato se precisar de ajuda! 😉 🪶Created by: @werbert_ofc"
+        "Entre em contato se precisar de ajuda! 😉"
     )
     bot.send_message(message.chat.id, welcome_text)
 
