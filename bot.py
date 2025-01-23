@@ -104,8 +104,7 @@ def start_message(message):
         "Comandos exclusivos do dono do bot:\n"
         "/addcomandovip <comando> - Restringe um comando para VIPs.\n"
         "/revcomandovip <comando> - Remove a restrição de comando VIP.\n\n"
-        "Entre em contato se precisar de ajuda! 😉
-🪶Created by: @werbert_ofc"
+        "Entre em contato se precisar de ajuda! 😉 🪶Created by: @werbert_ofc"
     )
     bot.send_message(message.chat.id, welcome_text)
 
