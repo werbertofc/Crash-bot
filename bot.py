@@ -6,7 +6,7 @@ import time
 BOT_TOKEN = "7972626459:AAGjV9QjaDRfEYXOO-X4TgXoWo2MqQbwMz8"
 SEU_ID_TELEGRAM = 6430703027
 bot = telebot.TeleBot(BOT_TOKEN)
-processos = {}
+processos = {}  # Dicionário para armazenar os processos de ataque
 authorized_users = [SEU_ID_TELEGRAM]  # Lista de usuários autorizados
 MAX_ATTACKS = 3  # Limite de ataques simultâneos
 
